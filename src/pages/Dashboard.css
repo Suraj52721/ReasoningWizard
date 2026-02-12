@@ -1,0 +1,357 @@
+.dashboard-page {
+    padding-top: 100px;
+    padding-bottom: 2rem;
+}
+
+.dashboard-inner {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+}
+
+.dash-header {
+    margin-bottom: 2rem;
+}
+
+.dash-title {
+    font-size: 2rem;
+    font-weight: 800;
+}
+
+.dash-subtitle {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin-top: 0.3rem;
+}
+
+/* Tabs */
+.dash-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 4px;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border);
+    overflow-x: auto;
+}
+
+.dash-tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: transparent;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    border: none;
+    font-family: inherit;
+}
+
+.dash-tab.active {
+    color: var(--primary);
+}
+
+.dash-tab:hover:not(.active) {
+    color: var(--text-secondary);
+}
+
+.tab-indicator {
+    position: absolute;
+    inset: 0;
+    background: rgba(245, 197, 24, 0.1);
+    border-radius: 10px;
+    z-index: -1;
+}
+
+/* Quiz Cards */
+.quiz-date-group {
+    margin-bottom: 2.5rem;
+}
+
+.date-heading {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.quiz-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.quiz-card {
+    padding: 1.5rem;
+    transition: var(--transition);
+}
+
+.quiz-card.completed {
+    opacity: 0.8;
+}
+
+.quiz-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+}
+
+.quiz-subject-badge {
+    background: rgba(245, 197, 24, 0.1);
+    color: var(--primary);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.completed-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--success);
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.quiz-card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.8rem;
+}
+
+.quiz-card-meta {
+    display: flex;
+    gap: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 1.2rem;
+}
+
+.quiz-card-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.quiz-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px !important;
+    font-size: 0.9rem !important;
+}
+
+/* Loading / Empty */
+.loading-state {
+    text-align: center;
+    padding: 4rem 0;
+    color: var(--text-muted);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top: 3px solid var(--primary);
+    border-radius: 50%;
+    margin: 0 auto 1rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-muted);
+}
+
+.empty-state svg {
+    font-size: 2.5rem;
+    color: var(--primary);
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+}
+
+/* Leaderboard */
+.leaderboard-card {
+    padding: 2rem;
+}
+
+.leaderboard-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1.5rem;
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+.leaderboard-header h3 {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.leaderboard-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+
+.leaderboard-row:hover {
+    background: rgba(245, 197, 24, 0.05);
+}
+
+.leaderboard-row.is-me {
+    background: rgba(245, 197, 24, 0.08);
+    border: 1px solid var(--border);
+}
+
+.lb-rank {
+    width: 36px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+.lb-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: var(--text-on-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.lb-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.lb-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.lb-time {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.lb-score {
+    font-weight: 700;
+    color: var(--primary);
+    font-size: 1rem;
+}
+
+/* Profile */
+.profile-card {
+    padding: 2rem;
+}
+
+.profile-header-section {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.profile-big-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: var(--text-on-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.profile-header-section h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.profile-email-text {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.profile-form {
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.profile-stats {
+    display: flex;
+    gap: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+}
+
+.profile-stat-item {
+    text-align: center;
+    flex: 1;
+}
+
+.profile-stat-value {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.profile-stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+@media (max-width: 768px) {
+    .dash-title {
+        font-size: 1.5rem;
+    }
+
+    .profile-stats {
+        gap: 1rem;
+    }
+
+    .profile-stat-value {
+        font-size: 1.4rem;
+    }
+}
