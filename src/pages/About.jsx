@@ -14,6 +14,8 @@ const stagger = {
     visible: { transition: { staggerChildren: 0.1 } }
 };
 
+import SEO from '../components/SEO';
+
 export default function About() {
     const values = [
         { icon: <FiTarget />, title: 'Mission-Driven', desc: 'Every quiz, worksheet and resource is designed to help UK students succeed in 11+, SATs, GCSEs and beyond.' },
@@ -38,6 +40,10 @@ export default function About() {
 
     return (
         <div className="about-page page-container">
+            <SEO
+                title="About Us - ReasoningWizard"
+                description="Learn about our mission to democratize education in the UK. Meet the team of educators behind ReasoningWizard."
+            />
             <div className="about-inner">
                 {/* Hero */}
                 <motion.section className="about-hero" variants={fadeUp} initial="hidden" animate="visible">

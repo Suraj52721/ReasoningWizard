@@ -11,6 +11,8 @@ const fadeUp = {
     })
 };
 
+import SEO from '../components/SEO';
+
 export default function Contact() {
     const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
     const [submitted, setSubmitted] = useState(false);
@@ -39,6 +41,10 @@ export default function Contact() {
 
     return (
         <div className="contact-page page-container">
+            <SEO
+                title="Contact Us - ReasoningWizard"
+                description="Get in touch with our team for support, partnership inquiries, or feedback. We're here to help you succeed."
+            />
             <div className="contact-inner">
                 {/* Hero */}
                 <motion.section className="contact-hero" variants={fadeUp} initial="hidden" animate="visible">

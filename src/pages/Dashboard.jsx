@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
-import { FiCalendar, FiClock, FiPlay, FiUser, FiEdit2, FiSave, FiTrendingUp, FiAward, FiCheckCircle, FiBook } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiPlay, FiUser, FiEdit2, FiSave, FiTrendingUp, FiAward, FiCheckCircle, FiBook, FiRefreshCw } from 'react-icons/fi';
 import './Dashboard.css';
 
 const fadeUp = {
@@ -17,6 +17,7 @@ const stagger = {
 
 export default function Dashboard() {
     const { user, profile, updateProfile } = useAuth();
+    const navigate = useNavigate();
     const [tab, setTab] = useState('quizzes');
     const [quizzes, setQuizzes] = useState([]);
     const [attempts, setAttempts] = useState([]);
@@ -173,11 +174,23 @@ export default function Dashboard() {
                                                             {attempt && <span><FiAward /> {attempt.score}/{attempt.total_questions}</span>}
                                                         </div>
                                                         {attempt ? (
-                                                            <Link to={`/quiz/${quiz.id}`}>
-                                                                <motion.button className="btn-secondary quiz-btn" whileHover={{ scale: 1.02 }}>
-                                                                    View Results
+                                                            <div className="quiz-card-actions">
+                                                                <Link to={`/quiz/${quiz.id}`}>
+                                                                    <motion.button className="btn-secondary quiz-btn" whileHover={{ scale: 1.02 }}>
+                                                                        View Results
+                                                                    </motion.button>
+                                                                </Link>
+                                                                <motion.button
+                                                                    className="btn-primary quiz-btn reattempt-dashboard-btn"
+                                                                    whileHover={{ scale: 1.02 }}
+                                                                    onClick={async () => {
+                                                                        await supabase.from('quiz_attempts').delete().eq('id', attempt.id);
+                                                                        navigate(`/quiz/${quiz.id}?reattempt=true`);
+                                                                    }}
+                                                                >
+                                                                    <FiRefreshCw /> Re-attempt
                                                                 </motion.button>
-                                                            </Link>
+                                                            </div>
                                                         ) : (
                                                             <Link to={`/quiz/${quiz.id}`}>
                                                                 <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }}>

@@ -7,6 +7,8 @@ import { HiMenu, HiX } from 'react-icons/hi';
 import { FiLogOut, FiUser, FiGrid, FiSun, FiMoon } from 'react-icons/fi';
 import './Navbar.css';
 
+import logo from '../assets/logo.png';
+
 export default function Navbar() {
     const { user, profile, signOut } = useAuth();
     const { theme, toggleTheme } = useTheme();
@@ -49,13 +51,13 @@ export default function Navbar() {
         >
             <div className="navbar-inner">
                 <Link to="/" className="navbar-logo">
-                    <motion.span
-                        className="logo-icon"
-                        whileHover={{ rotate: 15, scale: 1.1 }}
+                    <motion.img
+                        src={logo}
+                        alt="ReasoningWizard"
+                        className="logo-img"
+                        whileHover={{ rotate: 5, scale: 1.1 }}
                         transition={{ type: 'spring', stiffness: 300 }}
-                    >
-                        ✦
-                    </motion.span>
+                    />
                     <span className="logo-text">Reasoning<span className="logo-highlight">Wizard</span></span>
                 </Link>
 

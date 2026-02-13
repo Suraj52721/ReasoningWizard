@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { FiGithub, FiTwitter, FiMail } from 'react-icons/fi';
+import logo from '../assets/logo.png';
 import './Footer.css';
 
 export default function Footer() {
@@ -13,7 +14,10 @@ export default function Footer() {
         >
             <div className="footer-inner">
                 <div className="footer-brand">
-                    <span className="footer-logo">✦ Reasoning<span className="logo-highlight">Wizard</span></span>
+                    <span className="footer-logo">
+                        <img src={logo} alt="ReasoningWizard" className="footer-logo-img" />
+                        Reasoning<span className="logo-highlight">Wizard</span>
+                    </span>
                     <p className="footer-tagline">UK's premier tutoring & practice sheets academy. Empowering students with daily quizzes and personalised learning.</p>
                 </div>
                 <div className="footer-links">

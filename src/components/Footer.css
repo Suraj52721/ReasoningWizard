@@ -19,11 +19,19 @@
 }
 
 .footer-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     font-size: 1.3rem;
     font-weight: 700;
     color: var(--text-primary);
-    display: block;
     margin-bottom: 0.8rem;
+}
+
+.footer-logo-img {
+    height: 36px;
+    width: auto;
+    object-fit: contain;
 }
 
 .footer-tagline {

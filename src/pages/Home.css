@@ -355,14 +355,22 @@
     }
 
     .hero-stats {
+        flex-wrap: wrap;
         gap: 1.5rem;
+        justify-content: center;
+    }
+
+    .stat-item {
+        flex: 1 1 35%;
+        text-align: center;
     }
 
     .stat-value {
         font-size: 1.5rem;
     }
 
-    .steps-grid {
+    .steps-grid,
+    .features-grid {
         grid-template-columns: 1fr;
         gap: 1rem;
     }
@@ -434,16 +442,14 @@
     margin-bottom: 1rem;
 }
 
-.popup-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 64px;
-    height: 64px;
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    border-radius: 18px;
-    font-size: 2rem;
-    color: var(--text-on-primary);
+.popup-logo-img {
+    width: 80px;
+    height: auto;
+    object-fit: contain;
+    margin-bottom: 0.5rem;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .popup-title {

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
-import { FiClock, FiCheck, FiX, FiAlertCircle, FiArrowLeft, FiAward, FiTrendingUp, FiHome, FiMaximize, FiMinimize, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiClock, FiCheckCircle, FiTarget, FiPlay, FiPause, FiMaximize, FiMinimize, FiArrowLeft, FiAlertCircle, FiCheck, FiX, FiTrendingUp, FiAward, FiBarChart2, FiPercent, FiShare2, FiRefreshCw, FiHome, FiEye, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import SEO from '../components/SEO';
 import './Quiz.css';
 
 const fadeUp = {
@@ -14,7 +16,8 @@ const fadeUp = {
 export default function Quiz() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const [searchParams] = useSearchParams();
+    const { user, profile } = useAuth();
 
     const [quiz, setQuiz] = useState(null);
     const [questions, setQuestions] = useState([]);
@@ -24,9 +27,16 @@ export default function Quiz() {
     const [phase, setPhase] = useState('loading'); // loading | ready | active | submitted | error
     const [result, setResult] = useState(null);
     const [leaderboard, setLeaderboard] = useState([]);
+    const [totalParticipants, setTotalParticipants] = useState(0);
     const [existingAttempt, setExistingAttempt] = useState(null);
     const [error, setError] = useState(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
+    const [myRank, setMyRank] = useState(null);
+    const [averageScore, setAverageScore] = useState(0);
+    const [topperScore, setTopperScore] = useState(0);
+    const [showSolutions, setShowSolutions] = useState(false);
+    const [expandedSolutions, setExpandedSolutions] = useState({});
     const timerRef = useRef(null);
 
     // Focus mode: hide navbar/footer during active quiz
@@ -54,7 +64,7 @@ export default function Quiz() {
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(err => {
-                console.error(`Error enabling full-screen mode: ${err.message}`);
+                console.error(`Error enabling full - screen mode: ${err.message} `);
             });
         } else {
             if (document.exitFullscreen) {
@@ -79,6 +89,17 @@ export default function Quiz() {
         setQuestions(questionsData || []);
 
         if (attemptData) {
+            // If reattempt flag is set, skip showing results and go to ready
+            const isReattempt = searchParams.get('reattempt') === 'true';
+            if (isReattempt) {
+                // Delete old attempt and go straight to ready
+                await supabase.from('quiz_attempts').delete().eq('id', attemptData.id);
+                setTimeLeft(quizData?.duration_minutes * 60 || 600);
+                setPhase('active');
+                // Auto-enter fullscreen
+                document.documentElement.requestFullscreen().catch(() => { });
+                return;
+            }
             setExistingAttempt(attemptData);
             setResult({
                 score: attemptData.score,
@@ -87,10 +108,16 @@ export default function Quiz() {
                 answers: attemptData.answers || [],
             });
             setPhase('submitted');
-            fetchLeaderboard();
+            fetchLeaderboard({ score: attemptData.score, timeTaken: attemptData.time_taken_seconds });
         } else {
+            const isReattempt = searchParams.get('reattempt') === 'true';
             setTimeLeft(quizData?.duration_minutes * 60 || 600);
-            setPhase('ready');
+            if (isReattempt) {
+                setPhase('active');
+                document.documentElement.requestFullscreen().catch(() => { });
+            } else {
+                setPhase('ready');
+            }
         }
     }
 
@@ -99,16 +126,16 @@ export default function Quiz() {
         return () => clearInterval(timerRef.current);
     }, [id, user.id]);
 
-    async function fetchLeaderboard() {
+    async function fetchLeaderboard(currentStats = result) {
         const { data: attempts } = await supabase
             .from('quiz_attempts')
             .select('score, total_questions, time_taken_seconds, user_id')
             .eq('quiz_id', id)
             .order('score', { ascending: false })
             .order('time_taken_seconds', { ascending: true })
-            .limit(15);
+            .limit(10);
 
-        if (!attempts?.length) { setLeaderboard([]); return; }
+        if (!attempts?.length) { setLeaderboard([]); setMyRank(null); return; }
 
         const userIds = [...new Set(attempts.map(a => a.user_id))];
         const { data: profilesData } = await supabase
@@ -119,11 +146,73 @@ export default function Quiz() {
         const profileMap = {};
         (profilesData || []).forEach(p => { profileMap[p.id] = p; });
 
-        setLeaderboard(attempts.map(a => ({
+        const lbData = attempts.map(a => ({
             ...a,
             profiles: profileMap[a.user_id] || { display_name: 'Anonymous' }
-        })));
+        }));
+        setLeaderboard(lbData);
+
+        // Stats: Topper & Average
+        if (lbData.length > 0) {
+            setTopperScore(lbData[0].score);
+        }
+
+        // Fetch all scores for average calculation (optimization: could be an RPC or separate query)
+        const { data: allScores } = await supabase
+            .from('quiz_attempts')
+            .select('score')
+            .eq('quiz_id', id);
+
+        if (allScores?.length) {
+            setTotalParticipants(allScores.length);
+            const totalScore = allScores.reduce((sum, item) => sum + item.score, 0);
+            setAverageScore(Math.round((totalScore / allScores.length) * 10) / 10);
+        }
+
+        // Calculate accurate rank
+        if (!currentStats) return;
+
+        // 1. Check if user is in top 10
+        const rankIndex = lbData.findIndex(e => e.user_id === user.id);
+        if (rankIndex >= 0) {
+            setMyRank(rankIndex + 1);
+            return;
+        }
+
+        // 2. If not, query database for exact rank
+        // Count users with better score
+        const { count: betterScoreCount } = await supabase
+            .from('quiz_attempts')
+            .select('id', { count: 'exact', head: true })
+            .eq('quiz_id', id)
+            .gt('score', currentStats.score);
+
+        // Count users with same score but better time
+        const { count: sameScoreBetterTime } = await supabase
+            .from('quiz_attempts')
+            .select('id', { count: 'exact', head: true })
+            .eq('quiz_id', id)
+            .eq('score', currentStats.score)
+            .lt('time_taken_seconds', currentStats.timeTaken);
+
+        setMyRank((betterScoreCount || 0) + (sameScoreBetterTime || 0) + 1);
     }
+
+    // Re-attempt: delete old attempt, reset state
+    const handleReAttempt = async () => {
+        if (existingAttempt) {
+            await supabase.from('quiz_attempts').delete().eq('id', existingAttempt.id);
+        }
+        setExistingAttempt(null);
+        setResult(null);
+        setAnswers({});
+        setCurrentQ(0);
+        setMyRank(null);
+        setLeaderboard([]);
+        setIsPaused(false);
+        setTimeLeft(quiz?.duration_minutes * 60 || 600);
+        setPhase('ready');
+    };
 
     const handleSubmit = useCallback(async () => {
         clearInterval(timerRef.current);
@@ -152,9 +241,12 @@ export default function Quiz() {
             total_questions: questions.length,
             time_taken_seconds: totalTime,
             answers: answerDetails,
+            completed_at: new Date().toISOString(),
         };
 
-        const { error: submitError } = await supabase.from('quiz_attempts').insert(attempt);
+        const { error: submitError } = await supabase
+            .from('quiz_attempts')
+            .upsert(attempt, { onConflict: 'user_id, quiz_id' });
 
         if (submitError) {
             console.error("Error submitting attempt:", submitError);
@@ -168,7 +260,7 @@ export default function Quiz() {
             answers: answerDetails,
         });
         setPhase('submitted');
-        fetchLeaderboard();
+        fetchLeaderboard({ score: Math.round(score), timeTaken: totalTime });
 
         // Exit fullscreen on submit
         if (document.fullscreenElement && document.exitFullscreen) {
@@ -177,9 +269,12 @@ export default function Quiz() {
 
     }, [answers, questions, quiz, timeLeft, user.id, id]);
 
-    // Timer
+    // Timer (respects pause)
     useEffect(() => {
-        if (phase !== 'active') return;
+        if (phase !== 'active' || isPaused) {
+            clearInterval(timerRef.current);
+            return;
+        }
         timerRef.current = setInterval(() => {
             setTimeLeft(prev => {
                 if (prev <= 1) {
@@ -191,7 +286,9 @@ export default function Quiz() {
             });
         }, 1000);
         return () => clearInterval(timerRef.current);
-    }, [phase, handleSubmit]);
+    }, [phase, isPaused, handleSubmit]);
+
+    const togglePause = () => setIsPaused(p => !p);
 
     const handleStartQuiz = () => {
         setPhase('active');
@@ -206,7 +303,7 @@ export default function Quiz() {
     const formatTime = (seconds) => {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')} `;
     };
 
     const percentage = result ? Math.round((result.score / result.total) * 100) : 0;
@@ -237,6 +334,10 @@ export default function Quiz() {
     if (phase === 'ready') {
         return (
             <div className="quiz-page page-container">
+                <SEO
+                    title={quiz?.title}
+                    description={`Take the ${quiz?.title} quiz.${questions.length} questions, ${quiz?.duration_minutes} minutes.Test your skills now!`}
+                />
                 <div className="quiz-inner">
                     <motion.div className="ready-card glass-card" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
                         <div className="ready-icon">🧙‍♂️</div>
@@ -276,11 +377,74 @@ export default function Quiz() {
         );
     }
 
-    // Results Screen
+    // Results Screen — computed stats
+    const correctCount = result ? result.answers.filter(a => a?.correct).length : 0;
+    const wrongCount = result ? result.answers.filter(a => a && !a.correct && a.selected !== -1).length : 0;
+    const unattemptedCount = result ? result.answers.filter(a => a.selected === -1).length : 0;
+    const accuracy = result && (correctCount + wrongCount) > 0 ? Math.round((correctCount / (correctCount + wrongCount)) * 100) : 0;
+    const percentile = myRank && totalParticipants > 1 ? Math.round(((totalParticipants - myRank) / (totalParticipants - 1)) * 100) : 100;
+    const totalTimeSecs = quiz?.duration_minutes * 60 || 600;
+    const timeUsedPct = result ? Math.min(100, Math.round((result.timeTaken / totalTimeSecs) * 100)) : 0;
+
+    // Donut chart helper
+    const DonutSegment = ({ startAngle, endAngle, color, radius = 45, cx = 50, cy = 50 }) => {
+        const start = (startAngle - 90) * (Math.PI / 180);
+        const end = (endAngle - 90) * (Math.PI / 180);
+        const x1 = cx + radius * Math.cos(start);
+        const y1 = cy + radius * Math.sin(start);
+        const x2 = cx + radius * Math.cos(end);
+        const y2 = cy + radius * Math.sin(end);
+        const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+        if (endAngle - startAngle <= 0) return null;
+        return <path d={`M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`} fill={color} />;
+    };
+
+    // Mini circle component for performance summary
+    const MiniCircle = ({ value, max, label, icon, color, suffix = '' }) => {
+        const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+        const circumference = 2 * Math.PI * 36;
+        return (
+            <motion.div className="perf-circle-item" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                <div className="perf-circle-ring">
+                    <svg viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="36" fill="none" stroke="var(--border)" strokeWidth="5" />
+                        <motion.circle
+                            cx="40" cy="40" r="36"
+                            fill="none"
+                            stroke={color}
+                            strokeWidth="5"
+                            strokeLinecap="round"
+                            strokeDasharray={circumference}
+                            initial={{ strokeDashoffset: circumference }}
+                            animate={{ strokeDashoffset: circumference - (circumference * pct) / 100 }}
+                            transition={{ duration: 1.2, delay: 0.3 }}
+                            style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+                        />
+                    </svg>
+                    <div className="perf-circle-value">
+                        <span className="perf-val">{value}{suffix}</span>
+                        {max > 0 && <span className="perf-max">/{max}</span>}
+                    </div>
+                </div>
+                <div className="perf-circle-label">{icon} {label}</div>
+            </motion.div>
+        );
+    };
+
     if (phase === 'submitted') {
+        // Donut chart angles
+        const totalQ = result?.total || 1;
+        const correctAngle = (correctCount / totalQ) * 360;
+        const wrongAngle = (wrongCount / totalQ) * 360;
+        const unattemptedAngle = (unattemptedCount / totalQ) * 360;
+        let angle1 = 0;
+        let angle2 = correctAngle;
+        let angle3 = correctAngle + wrongAngle;
+
         return (
             <div className="quiz-page page-container">
-                <div className="quiz-inner">
+                <SEO title={`Results: ${quiz?.title} `} />
+                <div className="quiz-inner result-page">
                     {/* Confetti */}
                     {percentage >= 70 && (
                         <div className="confetti-container">
@@ -297,108 +461,165 @@ export default function Quiz() {
                         </div>
                     )}
 
-                    <motion.div className="result-card glass-card" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 100 }}>
-                        <div className="result-header">
-                            <motion.div
-                                className="result-circle"
-                                initial={{ strokeDashoffset: 283 }}
-                                animate={{ strokeDashoffset: 283 - (283 * percentage) / 100 }}
-                                transition={{ duration: 1.5, delay: 0.3 }}
-                            >
-                                <svg viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="45" className="circle-bg" />
-                                    <motion.circle
-                                        cx="50" cy="50" r="45"
-                                        className="circle-fill"
-                                        strokeDasharray="283"
-                                        initial={{ strokeDashoffset: 283 }}
-                                        animate={{ strokeDashoffset: 283 - (283 * percentage) / 100 }}
-                                        transition={{ duration: 1.5, delay: 0.3 }}
-                                    />
-                                </svg>
-                                <div className="circle-text">
-                                    <span className="circle-pct">{percentage}%</span>
-                                    <span className="circle-label">Score</span>
-                                </div>
-                            </motion.div>
-                            <div className="result-info">
-                                <h2>{percentage >= 70 ? '🎉 Excellent!' : percentage >= 40 ? '👍 Good Effort!' : '💪 Keep Trying!'}</h2>
-                                <p className="result-score">{result.score} / {result.total} correct</p>
-                                <p className="result-time"><FiClock /> {Math.floor(result.timeTaken / 60)}m {result.timeTaken % 60}s</p>
-                            </div>
+                    {/* Quiz Title Header */}
+                    <motion.div className="result-quiz-header" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+                        <h2>📝 {quiz?.title}</h2>
+                        <p className="result-quiz-meta">Attempted on {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} • {profile?.display_name || 'Student'}</p>
+                    </motion.div>
+
+                    {/* Overall Performance Summary */}
+                    <motion.div className="perf-summary glass-card" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
+                        <h3 className="section-title">Overall Performance Summary</h3>
+                        <div className="perf-circles-grid">
+                            <MiniCircle value={result.score} max={result.total} label="Your Score" icon={<FiTarget />} color="#33d00fff" />
+                            <MiniCircle value={`${Math.floor(result.timeTaken / 60)}:${(result.timeTaken % 60).toString().padStart(2, '0')} `} max="" label="Time Spent" icon={<FiClock />} color="#3B82F6" suffix="" />
+                            <MiniCircle value={myRank || '-'} max={leaderboard.length || '-'} label="Your Rank" icon={<FiAward />} color="#F59E0B" />
+                            <MiniCircle value={percentile} max={100} label="Percentile" icon={<FiBarChart2 />} color="#10B981" suffix="%" />
+                            <MiniCircle value={accuracy} max={100} label="Accuracy" icon={<FiPercent />} color="#8B5CF6" suffix="%" />
                         </div>
 
-                        {/* Answer Review */}
-                        <div className="answer-review">
-                            <h3>Question Review</h3>
-                            {questions.map((q, i) => {
-                                const ans = result.answers[i];
-                                const opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
-                                return (
-                                    <motion.div
-                                        key={i}
-                                        className={`review-item ${ans?.correct ? 'correct' : 'wrong'}`}
-                                        initial={{ opacity: 0, x: -20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: 0.1 * i }}
-                                    >
-                                        <div className="review-q">
-                                            <span className="review-num">Q{i + 1}</span>
-                                            <span>{q.question_text}</span>
-                                            <span className="review-badge">{ans?.correct ? '✓' : '✗'}</span>
-                                        </div>
-                                        <div className="review-answers">
-                                            {opts.map((opt, j) => (
-                                                <span
-                                                    key={j}
-                                                    className={`review-opt ${j === q.correct_option ? 'correct-opt' : ''} ${j === ans?.selected && !ans?.correct ? 'wrong-opt' : ''}`}
-                                                >
-                                                    {opt}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </motion.div>
-                                );
-                            })}
+                        {/* Action Buttons */}
+                        <div className="result-action-row">
+                            <motion.button className="btn-secondary result-action-btn" onClick={() => {
+                                const text = `I scored ${result.score}/${result.total} (${percentage}%) on ${quiz?.title} at ReasoningWizard! 🎯`;
+                                if (navigator.share) {
+                                    navigator.share({ title: 'My Quiz Result', text, url: window.location.href });
+                                } else {
+                                    navigator.clipboard.writeText(text);
+                                    alert('Result copied to clipboard!');
+                                }
+                            }} whileHover={{ scale: 1.03 }}>
+                                <FiShare2 /> Share
+                            </motion.button >
+                            <motion.button className="btn-primary result-action-btn" onClick={handleReAttempt} whileHover={{ scale: 1.03 }}>
+                                <FiRefreshCw /> Re Attempt
+                            </motion.button>
+                        </div >
+                    </motion.div >
+
+                    {/* Question Distribution */}
+                    < motion.div className="question-dist glass-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+                        <h3 className="section-title">Question Distribution</h3>
+                        <div className="dist-content">
+                            <div className="dist-donut">
+                                <svg viewBox="0 0 100 100">
+                                    {correctCount > 0 && <DonutSegment startAngle={angle1} endAngle={angle2} color="#10B981" />}
+                                    {wrongCount > 0 && <DonutSegment startAngle={angle2} endAngle={angle3} color="#EF4444" />}
+                                    {unattemptedCount > 0 && <DonutSegment startAngle={angle3} endAngle={360} color="#6B7280" />}
+                                    <circle cx="50" cy="50" r="28" fill="var(--bg-card)" />
+                                    <text x="50" y="50" textAnchor="middle" dominantBaseline="middle" className="donut-center-text" fill="var(--text-primary)" fontSize="12" fontWeight="700">{totalQ}Q</text>
+                                </svg>
+                            </div>
+                            <div className="dist-legend">
+                                <div className="legend-item">
+                                    <span className="legend-dot" style={{ background: '#10B981' }} />
+                                    <span>Correct</span>
+                                    <strong>{correctCount}</strong>
+                                </div>
+                                <div className="legend-item">
+                                    <span className="legend-dot" style={{ background: '#EF4444' }} />
+                                    <span>Wrong</span>
+                                    <strong>{wrongCount}</strong>
+                                </div>
+                                <div className="legend-item">
+                                    <span className="legend-dot" style={{ background: '#6B7280' }} />
+                                    <span>Unattempted</span>
+                                    <strong>{unattemptedCount}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div >
+
+                    {/* Comparison Chart */}
+                    <motion.div className="comparison-chart glass-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+                        <h3 className="section-title">Performance Comparison</h3>
+                        <div className="chart-container" style={{ width: '100%', height: 300 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                    data={[
+                                        { name: 'You', score: result.score, color: '#8B5CF6' },
+                                        { name: 'Average', score: averageScore, color: '#3B82F6' },
+                                        { name: 'Topper', score: topperScore, color: '#F59E0B' }
+                                    ]}
+                                    margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+                                >
+                                    <XAxis
+                                        dataKey="name"
+                                        stroke="#9CA3AF"
+                                        tick={{ fill: '#D1D5DB', fontSize: 12 }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                    />
+                                    <YAxis
+                                        hide
+                                        domain={[0, result.total || 'auto']}
+                                    />
+                                    <Tooltip
+                                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                        contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', borderRadius: '8px', color: '#F3F4F6' }}
+                                        itemStyle={{ color: '#F3F4F6' }}
+                                    />
+                                    <Bar dataKey="score" radius={[8, 8, 0, 0]} animationDuration={1500}>
+                                        <Cell fill="#8B5CF6" />
+                                        <Cell fill="#3B82F6" />
+                                        <Cell fill="#F59E0B" />
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
                         </div>
                     </motion.div>
 
                     {/* Leaderboard */}
-                    <motion.div className="quiz-leaderboard glass-card" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+                    < motion.div className="quiz-leaderboard glass-card" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
                         <div className="lb-header">
-                            <FiTrendingUp /> <h3>Quiz Leaderboard</h3>
+                            <FiTrendingUp /> <h3>Leaderboard</h3>
                         </div>
-                        {leaderboard.length === 0 ? (
-                            <p className="lb-empty">No attempts yet.</p>
-                        ) : (
-                            <div className="lb-list">
-                                {leaderboard.map((entry, i) => (
-                                    <motion.div
-                                        key={i}
-                                        className={`lb-row ${entry.user_id === user.id ? 'is-me' : ''}`}
-                                        initial={{ opacity: 0, x: -20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: 0.6 + i * 0.06 }}
-                                    >
-                                        <span className="lb-rank">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}</span>
-                                        <span className="lb-name">{entry.profiles?.display_name || 'Anonymous'}</span>
-                                        <span className="lb-score-val">{entry.score}/{entry.total_questions}</span>
-                                        <span className="lb-time-val">{Math.floor(entry.time_taken_seconds / 60)}m {entry.time_taken_seconds % 60}s</span>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        )}
-                    </motion.div>
+                        {
+                            leaderboard.length === 0 ? (
+                                <p className="lb-empty">No attempts yet.</p>
+                            ) : (
+                                <div className="lb-list">
+                                    {leaderboard.map((entry, i) => (
+                                        <motion.div
+                                            key={i}
+                                            className={`lb-row ${entry.user_id === user.id ? 'is-me' : ''}`}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: 0.6 + i * 0.06 }}
+                                        >
+                                            <span className="lb-rank-num">{i + 1}</span>
+                                            <span className="lb-avatar-circle">{entry.profiles?.display_name?.[0]?.toUpperCase() || '?'}</span>
+                                            <span className="lb-name">{entry.profiles?.display_name || 'Anonymous'}</span>
+                                            <span className="lb-score-val">{entry.score}/{entry.total_questions}</span>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            )
+                        }
+                    </motion.div >
 
-                    <div className="result-actions">
+                    {/* View Solutions — navigates to dedicated page */}
+                    < motion.div className="solutions-section glass-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+                        <Link to={`/quiz/${id}/solutions`}>
+                            <motion.button
+                                className="btn-primary btn-lg solutions-toggle-btn"
+                                whileHover={{ scale: 1.02 }}
+                            >
+                                <FiEye /> View Solutions
+                            </motion.button>
+                        </Link>
+                    </motion.div >
+
+                    {/* Bottom Actions */}
+                    < div className="result-bottom-actions" >
                         <Link to="/dashboard">
-                            <motion.button className="btn-primary btn-lg" whileHover={{ scale: 1.03 }}>
+                            <motion.button className="btn-secondary btn-lg" whileHover={{ scale: 1.03 }}>
                                 <FiHome /> Back to Dashboard
                             </motion.button>
                         </Link>
-                    </div>
-                </div>
-            </div>
+                    </div >
+                </div >
+            </div >
         );
     }
 
@@ -410,6 +631,7 @@ export default function Quiz() {
 
     return (
         <div className="quiz-page page-container">
+            <SEO title={`Playing: ${quiz?.title}`} />
             <div className="quiz-inner">
                 {/* Timer Bar */}
                 <motion.div className="quiz-topbar glass-card" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
@@ -423,7 +645,11 @@ export default function Quiz() {
                             {isFullscreen ? <FiMinimize /> : <FiMaximize />}
                         </button>
 
-                        <div className={`timer-display ${isLowTime ? 'low-time' : ''}`}>
+                        <button className="icon-btn pause-btn" onClick={togglePause} title={isPaused ? 'Resume Quiz' : 'Pause Quiz'}>
+                            {isPaused ? <FiPlay /> : <FiPause />}
+                        </button>
+
+                        <div className={`timer-display ${isLowTime ? 'low-time' : ''} ${isPaused ? 'paused' : ''}`}>
                             <FiClock />
                             <motion.span
                                 key={timeLeft}
@@ -521,6 +747,42 @@ export default function Quiz() {
                         </motion.button>
                     )}
                 </div>
+
+                {/* Pause Overlay */}
+                <AnimatePresence>
+                    {isPaused && (
+                        <motion.div
+                            className="pause-overlay"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                        >
+                            <motion.div
+                                className="pause-card glass-card"
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.8, opacity: 0 }}
+                                transition={{ type: 'spring', stiffness: 200 }}
+                            >
+                                <div className="pause-icon-wrap">
+                                    <FiPause />
+                                </div>
+                                <h2>Quiz Paused</h2>
+                                <p>Take a breather! Your progress is saved.</p>
+                                <p className="pause-time">Time remaining: {formatTime(timeLeft)}</p>
+                                <motion.button
+                                    className="btn-primary btn-lg"
+                                    onClick={togglePause}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    <FiPlay /> Resume Quiz
+                                </motion.button>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     );

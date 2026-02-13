@@ -710,3 +710,27 @@
         align-items: flex-start;
     }
 }
+
+/* Solution Textarea */
+.mq-solution-row {
+    margin-top: 0.75rem;
+    border-top: 1px dashed var(--border);
+    padding-top: 0.75rem;
+}
+
+.mq-solution-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+}
+
+.solution-textarea {
+    font-size: 0.85rem;
+    resize: vertical;
+    min-height: 60px;
+    line-height: 1.5;
+}

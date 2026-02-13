@@ -7,6 +7,9 @@ import { FiArrowRight, FiBookOpen, FiAward, FiTrendingUp, FiUsers, FiStar, FiChe
 import { HiOutlineAcademicCap, HiOutlineLightningBolt, HiOutlineChartBar } from 'react-icons/hi';
 import './Home.css';
 
+import SEO from '../components/SEO';
+import logo from '../assets/logo.png';
+
 const fadeUp = {
     hidden: { opacity: 0, y: 40 },
     visible: (i = 0) => ({
@@ -80,13 +83,13 @@ function LoginPopup({ onClose }) {
                     <FiX />
                 </button>
                 <div className="popup-icon-wrap">
-                    <motion.div
-                        className="popup-icon"
-                        animate={{ rotate: [0, 10, -10, 0] }}
-                        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                    >
-                        ✦
-                    </motion.div>
+                    <motion.img
+                        src={logo}
+                        alt="ReasoningWizard"
+                        className="popup-logo-img"
+                        animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.05, 1] }}
+                        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                    />
                 </div>
                 <h2 className="popup-title">Welcome to ReasoningWizard!</h2>
                 <p className="popup-desc">
@@ -201,6 +204,10 @@ export default function Home() {
 
     return (
         <div className="home-page">
+            <SEO
+                title="Home - UK's #1 Learning Platform"
+                description="Master 11+, SATs, and GCSEs with daily quizzes, practice sheets, and live leaderboards. Join 50,000+ UK students today."
+            />
             {/* Hero */}
             <section className="hero-section">
                 <FloatingParticles />

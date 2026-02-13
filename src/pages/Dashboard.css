@@ -343,15 +343,66 @@
 }
 
 @media (max-width: 768px) {
+    .dashboard-page {
+        padding-top: 85px;
+    }
+
+    .dashboard-inner {
+        padding: 0 1rem;
+    }
+
+    .dash-header {
+        text-align: center;
+    }
+
     .dash-title {
-        font-size: 1.5rem;
+        font-size: 1.6rem;
+    }
+
+    .quiz-cards {
+        grid-template-columns: 1fr;
     }
 
     .profile-stats {
         gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .profile-stat-item {
+        flex: 1 1 40%;
     }
 
     .profile-stat-value {
         font-size: 1.4rem;
+    }
+}
+
+/* Quiz Card Actions */
+.quiz-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.quiz-card-actions a,
+.quiz-card-actions button {
+    flex: 1;
+}
+
+.quiz-card-actions a button {
+    width: 100%;
+}
+
+.reattempt-dashboard-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 0.85rem;
+}
+
+@media (max-width: 480px) {
+    .quiz-card-actions {
+        flex-direction: column;
     }
 }

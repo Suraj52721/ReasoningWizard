@@ -24,10 +24,13 @@ function parseBulkQuestions(text) {
         let questionText = '';
         const options = [];
         let correctOption = 0;
+        let solution = '';
+        let capturingSolution = false;
 
         for (const line of lines) {
             if (/^Q[:.)]\s*/i.test(line)) {
                 questionText = line.replace(/^Q[:.)]\s*/i, '').trim();
+                capturingSolution = false;
             } else if (/^[A-D][:.)]\s*/i.test(line)) {
                 let optText = line.replace(/^[A-D][:.)]\s*/i, '').trim();
                 const isCorrect = optText.endsWith('*');
@@ -36,11 +39,27 @@ function parseBulkQuestions(text) {
                     correctOption = options.length;
                 }
                 options.push(optText);
+                capturingSolution = false;
+            } else if (/^(Sol|Solution|Exp|Explanation)[:.)]\s*/i.test(line)) {
+                const solText = line.replace(/^(Sol|Solution|Exp|Explanation)[:.)]\s*/i, '').trim();
+                if (solText) {
+                    solution = solText;
+                }
+                capturingSolution = true;
+            } else if (capturingSolution) {
+                solution += (solution ? '\n' : '') + line;
             }
         }
 
         if (questionText && options.length >= 2) {
-            parsed.push({ question_text: questionText, options, correct_option: correctOption, imageFile: null, imagePreview: null });
+            parsed.push({
+                question_text: questionText,
+                options,
+                correct_option: correctOption,
+                solution: solution,
+                imageFile: null,
+                imagePreview: null
+            });
         }
     }
     return parsed;
@@ -100,6 +119,7 @@ export default function Admin() {
             question_text: '',
             options: ['', '', '', ''],
             correct_option: 0,
+            solution: '',
             imageFile: null,
             imagePreview: null
         }]);
@@ -113,25 +133,27 @@ export default function Admin() {
 
     function handleImageSelect(index, e) {
         const file = e.target.files[0];
-        if (!file) return;
-
-        const updated = [...questions];
-        const previewUrl = URL.createObjectURL(file);
-        updated[index] = { ...updated[index], imageFile: file, imagePreview: previewUrl };
-        setQuestions(updated);
+        if (file) {
+            const updated = [...questions];
+            updated[index].imageFile = file;
+            updated[index].imagePreview = URL.createObjectURL(file);
+            setQuestions(updated);
+        }
     }
 
     function removeImage(index) {
         const updated = [...questions];
-        updated[index] = { ...updated[index], imageFile: null, imagePreview: null };
+        updated[index].imageFile = null;
+        updated[index].imagePreview = null;
         setQuestions(updated);
     }
 
     function updateOption(qIndex, oIndex, value) {
         const updated = [...questions];
-        const opts = [...updated[qIndex].options];
-        opts[oIndex] = value;
-        updated[qIndex] = { ...updated[qIndex], options: opts };
+        const prevOpts = updated[qIndex].options;
+        const newOpts = [...prevOpts];
+        newOpts[oIndex] = value;
+        updated[qIndex].options = newOpts;
         setQuestions(updated);
     }
 
@@ -215,6 +237,7 @@ export default function Admin() {
                         question_text: q.question_text.trim(),
                         options: q.options.filter(o => o.trim()),
                         correct_option: q.correct_option,
+                        solution: q.solution?.trim() || '',
                         image_url: finalImageUrl,
                     };
                 }));
@@ -260,10 +283,14 @@ export default function Admin() {
 
 
     async function deleteQuiz(quizId) {
-        if (!window.confirm('Delete this quiz and all its questions?')) return;
-        await supabase.from('quizzes').delete().eq('id', quizId);
-        fetchQuizzes();
-        setMessage({ type: 'success', text: 'Quiz deleted.' });
+        if (!window.confirm('Are you sure you want to delete this quiz?')) return;
+        const { error } = await supabase.from('quizzes').delete().eq('id', quizId);
+        if (error) {
+            setMessage({ type: 'error', text: 'Failed to delete.' });
+        } else {
+            setMessage({ type: 'success', text: 'Quiz deleted.' });
+            fetchQuizzes();
+        }
     }
 
     const tabs = [
@@ -364,24 +391,26 @@ export default function Admin() {
 
                                 {inputMode === 'bulk' ? (
                                     <div className="bulk-section">
-                                        <div className="bulk-help">
-                                            <strong>Format:</strong> Paste questions below. Mark correct answer with <code>*</code>
-                                        </div>
-                                        <pre className="bulk-example">
-                                            {`Q: What is 2 + 2?
-A: 3
-B: 4*
-C: 5
-D: 6
-
-Q: What shape is this?
-IMG: https://example.com/image.png
+                                        <p className="helper-text">
+                                            Format: Question text on one line, then options A, B, C, D. Mark correct option with *.
+                                            Add optional "Solution:" or "Exp:" line. Separate questions with a blank line.
+                                        </p>
+                                        <pre className="format-example">
+                                            {`Q1. Which shape has 3 sides?
 A: Circle
-B: Square*
-C: Triangle
+B: Square
+C: Triangle*
 D: Rectangle
+Solution:
+A triangle is a polygon with three edges and three vertices.
+It is one of the basic shapes in geometry.
 
-(Note: You can add images later)`}
+Q2. What is 5 x 5?
+A: 20
+B: 25*
+C: 30
+D: 35
+Exp: 5 times 5 equals 25.`}
                                         </pre>
                                         <textarea
                                             className="admin-input bulk-textarea"
@@ -447,6 +476,16 @@ D: Rectangle
                                                             />
                                                         </div>
                                                     ))}
+                                                </div>
+                                                <div className="mq-solution-row">
+                                                    <label className="mq-solution-label"><FiFileText /> Solution / Explanation</label>
+                                                    <textarea
+                                                        className="admin-input solution-textarea"
+                                                        placeholder="Enter detailed solution or explanation for this question (optional)..."
+                                                        rows={3}
+                                                        value={q.solution || ''}
+                                                        onChange={e => updateQuestion(qi, 'solution', e.target.value)}
+                                                    />
                                                 </div>
                                             </motion.div>
                                         ))}
