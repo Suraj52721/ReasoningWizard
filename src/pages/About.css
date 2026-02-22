@@ -178,6 +178,10 @@
 }
 
 @media (max-width: 768px) {
+    .about-hero {
+        padding: 1.5rem 0 2rem;
+    }
+
     .about-title {
         font-size: 2rem;
     }

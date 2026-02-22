@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { FiMail, FiLock, FiPhone, FiArrowRight, FiAlertCircle } from 'react-icons/fi';
+import { FiMail, FiLock, FiArrowRight, FiAlertCircle } from 'react-icons/fi';
 import { FcGoogle } from 'react-icons/fc';
 import './Auth.css';
 
@@ -12,14 +12,17 @@ const fadeUp = {
 };
 
 export default function Login() {
-    const { signInWithEmail, signInWithGoogle, sendOtp, verifyOtp } = useAuth();
+    const { signInWithEmail, signInWithGoogle, user } = useAuth();
     const navigate = useNavigate();
-    const [tab, setTab] = useState('email'); // email | phone
+
+    useEffect(() => {
+        if (user) {
+            navigate('/dashboard');
+        }
+    }, [user, navigate]);
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [phone, setPhone] = useState('');
-    const [otp, setOtp] = useState('');
-    const [otpSent, setOtpSent] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -39,25 +42,6 @@ export default function Login() {
         if (error) setError(error.message);
     };
 
-    const handleSendOtp = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-        const { error } = await sendOtp(phone);
-        setLoading(false);
-        if (error) setError(error.message);
-        else setOtpSent(true);
-    };
-
-    const handleVerifyOtp = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-        const { error } = await verifyOtp(phone, otp);
-        setLoading(false);
-        if (error) setError(error.message);
-        else navigate('/dashboard');
-    };
 
     return (
         <div className="auth-page page-container">
@@ -68,15 +52,7 @@ export default function Login() {
                     <p className="auth-subtitle">Sign in to continue your learning journey</p>
                 </motion.div>
 
-                {/* Tab Switcher */}
-                <motion.div className="auth-tabs" variants={fadeUp} initial="hidden" animate="visible" custom={1}>
-                    <button className={`auth-tab ${tab === 'email' ? 'active' : ''}`} onClick={() => { setTab('email'); setError(''); }}>
-                        <FiMail /> Email
-                    </button>
-                    <button className={`auth-tab ${tab === 'phone' ? 'active' : ''}`} onClick={() => { setTab('phone'); setError(''); setOtpSent(false); }}>
-                        <FiPhone /> Phone OTP
-                    </button>
-                </motion.div>
+
 
                 <AnimatePresence>
                     {error && (
@@ -86,49 +62,19 @@ export default function Login() {
                     )}
                 </AnimatePresence>
 
-                <AnimatePresence mode="wait">
-                    {tab === 'email' ? (
-                        <motion.form key="email" onSubmit={handleEmailLogin} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.3 }}>
-                            <div className="input-group">
-                                <FiMail className="input-icon" />
-                                <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required className="auth-input" />
-                            </div>
-                            <div className="input-group">
-                                <FiLock className="input-icon" />
-                                <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="auth-input" />
-                            </div>
-                            <motion.button type="submit" className="btn-primary auth-submit" disabled={loading} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                                {loading ? 'Signing in...' : 'Sign In'} <FiArrowRight />
-                            </motion.button>
-                        </motion.form>
-                    ) : (
-                        <motion.div key="phone" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
-                            {!otpSent ? (
-                                <form onSubmit={handleSendOtp}>
-                                    <div className="input-group">
-                                        <FiPhone className="input-icon" />
-                                        <input type="tel" placeholder="+44 7XXX XXXXXX" value={phone} onChange={e => setPhone(e.target.value)} required className="auth-input" />
-                                    </div>
-                                    <motion.button type="submit" className="btn-primary auth-submit" disabled={loading} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                                        {loading ? 'Sending...' : 'Send OTP'} <FiArrowRight />
-                                    </motion.button>
-                                </form>
-                            ) : (
-                                <form onSubmit={handleVerifyOtp}>
-                                    <p className="otp-info">OTP sent to <strong>{phone}</strong></p>
-                                    <div className="input-group">
-                                        <FiLock className="input-icon" />
-                                        <input type="text" placeholder="Enter 6-digit OTP" value={otp} onChange={e => setOtp(e.target.value)} required maxLength={6} className="auth-input" />
-                                    </div>
-                                    <motion.button type="submit" className="btn-primary auth-submit" disabled={loading} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                                        {loading ? 'Verifying...' : 'Verify OTP'} <FiArrowRight />
-                                    </motion.button>
-                                    <button type="button" className="resend-btn" onClick={() => setOtpSent(false)}>Change phone number</button>
-                                </form>
-                            )}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                <motion.form onSubmit={handleEmailLogin} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
+                    <div className="input-group">
+                        <FiMail className="input-icon" />
+                        <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required className="auth-input" />
+                    </div>
+                    <div className="input-group">
+                        <FiLock className="input-icon" />
+                        <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="auth-input" />
+                    </div>
+                    <motion.button type="submit" className="btn-primary auth-submit" disabled={loading} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                        {loading ? 'Signing in...' : 'Sign In'} <FiArrowRight />
+                    </motion.button>
+                </motion.form>
 
                 <div className="auth-divider">
                     <span>or</span>

@@ -346,6 +346,16 @@
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
+    .hero-section {
+        padding: 100px 1.5rem 60px;
+    }
+
+    .features-section,
+    .steps-section,
+    .testimonials-section {
+        padding: 4rem 1.5rem;
+    }
+
     .hero-title {
         font-size: 2.5rem;
     }

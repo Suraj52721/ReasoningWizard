@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FiMail, FiPhone, FiMapPin, FiSend, FiMessageCircle, FiClock } from 'react-icons/fi';
+import { FiMail, FiPhone, FiMapPin, FiClock } from 'react-icons/fi';
+import { FaWhatsapp } from 'react-icons/fa';
 import './Contact.css';
 
 const fadeUp = {
@@ -14,27 +14,10 @@ const fadeUp = {
 import SEO from '../components/SEO';
 
 export default function Contact() {
-    const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
-    const [submitted, setSubmitted] = useState(false);
-    const [sending, setSending] = useState(false);
-
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        setSending(true);
-        // Simulate sending
-        setTimeout(() => {
-            setSending(false);
-            setSubmitted(true);
-        }, 1200);
-    };
 
     const contactInfo = [
-        { icon: <FiMail />, label: 'Email', value: 'hello@reasoningwizard.co.uk', href: 'mailto:hello@reasoningwizard.co.uk' },
-        { icon: <FiPhone />, label: 'Phone', value: '+44 20 1234 5678', href: 'tel:+442012345678' },
+        { icon: <FiMail />, label: 'Email', value: 'support@reasoningwizard.com', href: 'mailto:support@reasoningwizard.com' },
+        { icon: <FiPhone />, label: 'Phone', value: '+919560103627', href: 'tel:+919560103627' },
         { icon: <FiMapPin />, label: 'Address', value: 'London, United Kingdom', href: null },
         { icon: <FiClock />, label: 'Hours', value: 'Mon–Fri, 9am–6pm GMT', href: null },
     ];
@@ -58,106 +41,39 @@ export default function Contact() {
 
                 <div className="contact-grid">
                     {/* Contact Form */}
+                    {/* WhatsApp Action */}
                     <motion.div
                         className="contact-form-card glass-card"
                         variants={fadeUp}
                         initial="hidden"
                         animate="visible"
                         custom={2}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '4rem 2rem' }}
                     >
-                        {submitted ? (
-                            <motion.div
-                                className="contact-success"
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ type: 'spring', stiffness: 200 }}
+                        <div className="success-icon-lg" style={{ background: 'linear-gradient(135deg, #25D366, #128C7E)' }}>
+                            <FaWhatsapp />
+                        </div>
+                        <h2 className="form-title" style={{ justifyContent: 'center', marginBottom: '1rem', color: '#25D366' }}>
+                            Chat with us on WhatsApp
+                        </h2>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '2.5rem', fontSize: '1.1rem', lineHeight: '1.6' }}>
+                            Skip the forms and wait times. Connect with our support team directly on WhatsApp for instant assistance.
+                        </p>
+                        <a
+                            href="https://wa.me/919560103627"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ textDecoration: 'none', width: '100%', maxWidth: '300px' }}
+                        >
+                            <motion.button
+                                className="btn-primary contact-submit-btn"
+                                whileHover={{ scale: 1.03 }}
+                                whileTap={{ scale: 0.97 }}
+                                style={{ background: '#25D366', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}
                             >
-                                <div className="success-icon-lg">
-                                    <FiMessageCircle />
-                                </div>
-                                <h3>Message Sent!</h3>
-                                <p>Thank you for reaching out. We'll get back to you within 24 hours.</p>
-                                <motion.button
-                                    className="btn-secondary"
-                                    onClick={() => { setSubmitted(false); setForm({ name: '', email: '', subject: '', message: '' }); }}
-                                    whileHover={{ scale: 1.03 }}
-                                    whileTap={{ scale: 0.97 }}
-                                >
-                                    Send Another Message
-                                </motion.button>
-                            </motion.div>
-                        ) : (
-                            <>
-                                <h2 className="form-title">
-                                    <FiSend /> Send a Message
-                                </h2>
-                                <form onSubmit={handleSubmit} className="contact-form">
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label htmlFor="name">Full Name</label>
-                                            <input
-                                                id="name"
-                                                name="name"
-                                                type="text"
-                                                placeholder="Your name"
-                                                value={form.name}
-                                                onChange={handleChange}
-                                                required
-                                                className="contact-input"
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label htmlFor="email">Email</label>
-                                            <input
-                                                id="email"
-                                                name="email"
-                                                type="email"
-                                                placeholder="you@example.com"
-                                                value={form.email}
-                                                onChange={handleChange}
-                                                required
-                                                className="contact-input"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="subject">Subject</label>
-                                        <input
-                                            id="subject"
-                                            name="subject"
-                                            type="text"
-                                            placeholder="What's this about?"
-                                            value={form.subject}
-                                            onChange={handleChange}
-                                            required
-                                            className="contact-input"
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="message">Message</label>
-                                        <textarea
-                                            id="message"
-                                            name="message"
-                                            placeholder="Tell us more..."
-                                            rows={5}
-                                            value={form.message}
-                                            onChange={handleChange}
-                                            required
-                                            className="contact-input contact-textarea"
-                                        />
-                                    </div>
-                                    <motion.button
-                                        type="submit"
-                                        className="btn-primary contact-submit-btn"
-                                        disabled={sending}
-                                        whileHover={{ scale: 1.03 }}
-                                        whileTap={{ scale: 0.97 }}
-                                    >
-                                        {sending ? 'Sending...' : <><FiSend /> Send Message</>}
-                                    </motion.button>
-                                </form>
-                            </>
-                        )}
+                                <FaWhatsapp size={20} /> Open WhatsApp
+                            </motion.button>
+                        </a>
                     </motion.div>
 
                     {/* Contact Info Sidebar */}

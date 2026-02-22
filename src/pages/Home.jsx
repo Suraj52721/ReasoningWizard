@@ -61,7 +61,7 @@ function FloatingParticles() {
     );
 }
 
-function LoginPopup({ onClose }) {
+function LoginPopup({ onClose, user }) {
     return (
         <motion.div
             className="login-popup-overlay"
@@ -96,22 +96,22 @@ function LoginPopup({ onClose }) {
                     Sign in to access daily quizzes, track your progress on leaderboards, and start mastering your exams.
                 </p>
                 <div className="popup-actions">
-                    <Link to="/login" onClick={onClose}>
+                    <Link to={user ? "/dashboard" : "/login"} onClick={onClose}>
                         <motion.button
                             className="btn-primary popup-btn"
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
                         >
-                            <FiLogIn /> Sign In
+                            <FiLogIn /> {user ? 'Go to Dashboard' : 'Sign In'}
                         </motion.button>
                     </Link>
-                    <Link to="/register" onClick={onClose}>
+                    <Link to={user ? "/dashboard" : "/register"} onClick={onClose}>
                         <motion.button
                             className="btn-secondary popup-btn"
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
                         >
-                            Create Account <FiArrowRight />
+                            {user ? 'Dashboard' : 'Create Account'} <FiArrowRight />
                         </motion.button>
                     </Link>
                 </div>
@@ -225,14 +225,14 @@ export default function Home() {
                         and live leaderboards — everything you need to ace your exams.
                     </motion.p>
                     <motion.div className="hero-ctas" variants={fadeUp} initial="hidden" animate="visible" custom={3}>
-                        <Link to="/register">
+                        <Link to={user ? "/dashboard" : "/register"}>
                             <motion.button className="btn-primary btn-lg" whileHover={{ scale: 1.04, boxShadow: '0 0 40px rgba(245,197,24,0.4)' }} whileTap={{ scale: 0.96 }}>
-                                Start Free <FiArrowRight />
+                                {user ? 'Go to Dashboard' : 'Start Free'} <FiArrowRight />
                             </motion.button>
                         </Link>
-                        <Link to="/login">
+                        <Link to={user ? "/dashboard" : "/login"}>
                             <motion.button className="btn-secondary btn-lg" whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
-                                Sign In
+                                {user ? 'Dashboard' : 'Sign In'}
                             </motion.button>
                         </Link>
                     </motion.div>
@@ -360,9 +360,9 @@ export default function Home() {
                         <FiCheckCircle className="cta-icon" />
                         <h2>Ready to Become a Reasoning Wizard?</h2>
                         <p>Join thousands of UK students who are mastering their exams with daily quizzes and expert resources.</p>
-                        <Link to="/register">
+                        <Link to={user ? "/dashboard" : "/register"}>
                             <motion.button className="btn-primary btn-lg" whileHover={{ scale: 1.05, boxShadow: '0 0 40px rgba(245,197,24,0.4)' }} whileTap={{ scale: 0.95 }}>
-                                Get Started — It's Free <FiArrowRight />
+                                {user ? 'Go to Dashboard' : "Get Started — It's Free"} <FiArrowRight />
                             </motion.button>
                         </Link>
                     </motion.div>
@@ -371,7 +371,7 @@ export default function Home() {
 
             {/* Login Popup */}
             <AnimatePresence>
-                {showPopup && <LoginPopup onClose={handleClosePopup} />}
+                {showPopup && <LoginPopup onClose={handleClosePopup} user={user} />}
             </AnimatePresence>
         </div>
     );
