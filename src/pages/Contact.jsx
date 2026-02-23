@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { FiMail, FiPhone, FiMapPin, FiClock } from 'react-icons/fi';
+import { FiMail, FiPhone, FiMapPin, FiClock, FiFacebook } from 'react-icons/fi';
 import { FaWhatsapp } from 'react-icons/fa';
 import './Contact.css';
 
@@ -18,6 +18,7 @@ export default function Contact() {
     const contactInfo = [
         { icon: <FiMail />, label: 'Email', value: 'support@reasoningwizard.com', href: 'mailto:support@reasoningwizard.com' },
         { icon: <FiPhone />, label: 'Phone', value: '+919560103627', href: 'tel:+919560103627' },
+        { icon: <FiFacebook />, label: 'Facebook', value: 'Reasoning Wizard', href: 'https://www.facebook.com/share/1DWaXgeZ1c/' },
         { icon: <FiMapPin />, label: 'Address', value: 'London, United Kingdom', href: null },
         { icon: <FiClock />, label: 'Hours', value: 'Mon–Fri, 9am–6pm GMT', href: null },
     ];
@@ -54,13 +55,13 @@ export default function Contact() {
                             <FaWhatsapp />
                         </div>
                         <h2 className="form-title" style={{ justifyContent: 'center', marginBottom: '1rem', color: '#25D366' }}>
-                            Chat with us on WhatsApp
+                            Join our WhatsApp Community
                         </h2>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: '2.5rem', fontSize: '1.1rem', lineHeight: '1.6' }}>
-                            Skip the forms and wait times. Connect with our support team directly on WhatsApp for instant assistance.
+                            Connect with other students and our support team. Join our WhatsApp community for instant updates, resources, and assistance.
                         </p>
                         <a
-                            href="https://wa.me/919560103627"
+                            href="https://chat.whatsapp.com/KDNR17OSuAjGIQDpyy0oWp"
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{ textDecoration: 'none', width: '100%', maxWidth: '300px' }}
@@ -71,7 +72,7 @@ export default function Contact() {
                                 whileTap={{ scale: 0.97 }}
                                 style={{ background: '#25D366', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}
                             >
-                                <FaWhatsapp size={20} /> Open WhatsApp
+                                <FaWhatsapp size={20} /> Join Community
                             </motion.button>
                         </a>
                     </motion.div>

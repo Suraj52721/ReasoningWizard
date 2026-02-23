@@ -11,6 +11,11 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import Careers from './pages/Careers';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import Questions from './pages/Questions';
+import QuestionDetail from './pages/QuestionDetail';
 import Dashboard from './pages/Dashboard';
 import Quiz from './pages/Quiz';
 import QuizSolutions from './pages/QuizSolutions';
@@ -30,6 +35,11 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
+              <Route path="/careers" element={<Careers />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/questions" element={<Questions />} />
+              <Route path="/question/:questionId" element={<QuestionDetail />} />
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />

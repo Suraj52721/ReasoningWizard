@@ -177,10 +177,10 @@ export default function Home() {
     const heroY = useTransform(scrollYProgress, [0, 0.3], [0, -80]);
 
     const features = [
-        { icon: <FiBookOpen />, title: 'Daily Quizzes', desc: 'Fresh quizzes every day across Maths, Science, English and more. Stay sharp with timed challenges.' },
+        { icon: <FiBookOpen />, title: 'Daily Quizzes', desc: 'Fresh quizzes every day across Maths, VR, NVR and more. Stay sharp with timed challenges.' },
         { icon: <FiAward />, title: 'Practice Sheets', desc: 'Comprehensive worksheet packs aligned to UK curriculum. Download, print and conquer.' },
         { icon: <FiTrendingUp />, title: 'Live Leaderboards', desc: 'Compete with students across the UK. Track your rank and climb to the top daily.' },
-        { icon: <FiUsers />, title: 'Expert Tutoring', desc: 'Learn from experienced UK educators with personalised guidance and feedback.' },
+        { icon: <FiUsers />, title: 'Expert Tutoring', desc: 'Learn from experienced educators with personalised guidance and feedback.' },
     ];
 
     const steps = [
@@ -217,8 +217,7 @@ export default function Home() {
                         <FiStar /> Trusted by 50,000+ UK Students
                     </motion.div>
                     <motion.h1 className="hero-title" variants={fadeUp} initial="hidden" animate="visible" custom={1}>
-                        Master Your <span className="text-gradient">Reasoning</span><br />
-                        Like a <span className="text-gradient">Wizard</span> ✦
+                        Learn Smarter,<br /> Faster and Better with <br /> <span className="text-gradient">Reasoning Wizard</span> ✦
                     </motion.h1>
                     <motion.p className="hero-subtitle" variants={fadeUp} initial="hidden" animate="visible" custom={2}>
                         UK's #1 tutoring & practice sheets academy. Daily quizzes, expert worksheets
@@ -227,7 +226,7 @@ export default function Home() {
                     <motion.div className="hero-ctas" variants={fadeUp} initial="hidden" animate="visible" custom={3}>
                         <Link to={user ? "/dashboard" : "/register"}>
                             <motion.button className="btn-primary btn-lg" whileHover={{ scale: 1.04, boxShadow: '0 0 40px rgba(245,197,24,0.4)' }} whileTap={{ scale: 0.96 }}>
-                                {user ? 'Go to Dashboard' : 'Start Free'} <FiArrowRight />
+                                {user ? 'Go to Dashboard' : 'Start Free 11+ Practice'} <FiArrowRight />
                             </motion.button>
                         </Link>
                         <Link to={user ? "/dashboard" : "/login"}>

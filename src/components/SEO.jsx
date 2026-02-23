@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-export default function SEO({ title, description, keywords, image }) {
+export default function SEO({ title, description, keywords, image, schema }) {
     const location = useLocation();
     const siteTitle = "ReasoningWizard";
     const fullTitle = title ? `${title} | ${siteTitle}` : siteTitle;
@@ -56,7 +56,23 @@ export default function SEO({ title, description, keywords, image }) {
         setMeta('property', 'twitter:title', fullTitle);
         setMeta('property', 'twitter:description', metaDesc);
         setMeta('property', 'twitter:image', metaImage);
-    }, [fullTitle, metaDesc, metaKeywords, url, metaImage]);
+
+        // JSON-LD Structured Data
+        const existingScript = document.querySelector('script[data-seo-jsonld]');
+        if (schema) {
+            if (existingScript) {
+                existingScript.textContent = JSON.stringify(schema);
+            } else {
+                const script = document.createElement('script');
+                script.type = 'application/ld+json';
+                script.setAttribute('data-seo-jsonld', 'true');
+                script.textContent = JSON.stringify(schema);
+                document.head.appendChild(script);
+            }
+        } else if (existingScript) {
+            existingScript.remove();
+        }
+    }, [fullTitle, metaDesc, metaKeywords, url, metaImage, schema]);
 
     return null; // This component only manages <head>, renders nothing
 }
