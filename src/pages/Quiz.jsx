@@ -38,6 +38,35 @@ export default function Quiz() {
     const [showSolutions, setShowSolutions] = useState(false);
     const [expandedSolutions, setExpandedSolutions] = useState({});
     const timerRef = useRef(null);
+    const [sessionId, setSessionId] = useState(null);
+    const [isResuming, setIsResuming] = useState(false);
+
+    const latestState = useRef({ answers, timeLeft, currentQ });
+    useEffect(() => {
+        latestState.current = { answers, timeLeft, currentQ };
+    }, [answers, timeLeft, currentQ]);
+
+    const saveSession = useCallback(async () => {
+        if (!user || !id) return;
+        const state = latestState.current;
+        const session = {
+            user_id: user.id,
+            quiz_id: id,
+            answers: state.answers,
+            time_left_seconds: state.timeLeft,
+            current_question: state.currentQ,
+            updated_at: new Date().toISOString()
+        };
+        const { data, error } = await supabase
+            .from('quiz_sessions')
+            .upsert(session, { onConflict: 'user_id, quiz_id' })
+            .select()
+            .single();
+
+        if (!error && data) {
+            setSessionId(data.id);
+        }
+    }, [user, id]);
 
     // Focus mode: hide navbar/footer during active quiz
     // NOTE: Removed overflow: hidden to allow scrolling as requested
@@ -78,9 +107,10 @@ export default function Quiz() {
         const { data: quizData, error: quizError } = await supabase.from('quizzes').select('*').eq('id', id).single();
         const { data: questionsData, error: questionsError } = await supabase.from('questions').select('*').eq('quiz_id', id).order('sort_order');
         const { data: attemptData, error: attemptError } = await supabase.from('quiz_attempts').select('*').eq('quiz_id', id).eq('user_id', user.id).maybeSingle();
+        const { data: sessionData, error: sessionError } = await supabase.from('quiz_sessions').select('*').eq('quiz_id', id).eq('user_id', user.id).maybeSingle();
 
-        if (quizError || questionsError || attemptError) {
-            setError(quizError?.message || questionsError?.message || attemptError?.message || 'Failed to load quiz data.');
+        if (quizError || questionsError || attemptError || sessionError) {
+            setError(quizError?.message || questionsError?.message || attemptError?.message || sessionError?.message || 'Failed to load quiz data.');
             setPhase('error');
             return;
         }
@@ -94,6 +124,7 @@ export default function Quiz() {
             if (isReattempt) {
                 // Delete old attempt and go straight to ready
                 await supabase.from('quiz_attempts').delete().eq('id', attemptData.id);
+                await supabase.from('quiz_sessions').delete().eq('user_id', user.id).eq('quiz_id', id);
                 setTimeLeft(quizData?.duration_minutes * 60 || 600);
                 setPhase('active');
                 // Auto-enter fullscreen
@@ -111,12 +142,21 @@ export default function Quiz() {
             fetchLeaderboard({ score: attemptData.score, timeTaken: attemptData.time_taken_seconds });
         } else {
             const isReattempt = searchParams.get('reattempt') === 'true';
-            setTimeLeft(quizData?.duration_minutes * 60 || 600);
-            if (isReattempt) {
-                setPhase('active');
-                document.documentElement.requestFullscreen().catch(() => { });
-            } else {
+            if (sessionData && !isReattempt) {
+                setSessionId(sessionData.id);
+                setAnswers(sessionData.answers || {});
+                setTimeLeft(sessionData.time_left_seconds);
+                setCurrentQ(sessionData.current_question || 0);
+                setIsResuming(true);
                 setPhase('ready');
+            } else {
+                setTimeLeft(quizData?.duration_minutes * 60 || 600);
+                if (isReattempt) {
+                    setPhase('active');
+                    document.documentElement.requestFullscreen().catch(() => { });
+                } else {
+                    setPhase('ready');
+                }
             }
         }
     }
@@ -203,6 +243,7 @@ export default function Quiz() {
         if (existingAttempt) {
             await supabase.from('quiz_attempts').delete().eq('id', existingAttempt.id);
         }
+        await supabase.from('quiz_sessions').delete().eq('user_id', user.id).eq('quiz_id', id);
         setExistingAttempt(null);
         setResult(null);
         setAnswers({});
@@ -210,6 +251,8 @@ export default function Quiz() {
         setMyRank(null);
         setLeaderboard([]);
         setIsPaused(false);
+        setIsResuming(false);
+        setSessionId(null);
         setTimeLeft(quiz?.duration_minutes * 60 || 600);
         setPhase('ready');
     };
@@ -247,6 +290,8 @@ export default function Quiz() {
         const { error: submitError } = await supabase
             .from('quiz_attempts')
             .upsert(attempt, { onConflict: 'user_id, quiz_id' });
+
+        await supabase.from('quiz_sessions').delete().eq('user_id', user.id).eq('quiz_id', id);
 
         if (submitError) {
             console.error("Error submitting attempt:", submitError);
@@ -288,16 +333,40 @@ export default function Quiz() {
         return () => clearInterval(timerRef.current);
     }, [phase, isPaused, handleSubmit]);
 
-    const togglePause = () => setIsPaused(p => !p);
+    // Auto-save periodically
+    useEffect(() => {
+        if (phase !== 'active' || isPaused) return;
+        const interval = setInterval(() => {
+            saveSession();
+        }, 15000);
+        return () => clearInterval(interval);
+    }, [phase, isPaused, saveSession]);
+
+    const togglePause = () => {
+        setIsPaused(p => {
+            const newPaused = !p;
+            if (newPaused) {
+                saveSession();
+            }
+            return newPaused;
+        });
+    };
 
     const handleStartQuiz = () => {
         setPhase('active');
-        setTimeLeft(quiz.duration_minutes * 60); // Reset timer
+        if (!isResuming) {
+            setTimeLeft(quiz.duration_minutes * 60); // Reset timer
+        }
         toggleFullscreen();
     };
 
     const selectAnswer = (qIndex, optionIndex) => {
-        setAnswers(prev => ({ ...prev, [qIndex]: optionIndex }));
+        setAnswers(prev => {
+            const newAnswers = { ...prev, [qIndex]: optionIndex };
+            latestState.current.answers = newAnswers; // sync ref immediately
+            saveSession();
+            return newAnswers;
+        });
     };
 
     const formatTime = (seconds) => {
@@ -351,7 +420,7 @@ export default function Quiz() {
                             <h4>Instructions</h4>
                             <ul>
                                 <li>Answer all questions within the time limit</li>
-                                <li>You cannot pause or restart the quiz</li>
+                                <li>You can pause and save your progress at any time</li>
                                 <li>Your score and time will be recorded</li>
                                 {quiz?.negative_marking && (
                                     <li style={{ color: 'var(--warning)', fontWeight: 600 }}>
@@ -363,7 +432,7 @@ export default function Quiz() {
                         </div>
                         <div className="ready-actions">
                             <motion.button className="btn-primary btn-lg" onClick={handleStartQuiz} whileHover={{ scale: 1.04, boxShadow: '0 0 30px rgba(245,197,24,0.4)' }} whileTap={{ scale: 0.96 }}>
-                                Start Quiz 🚀
+                                {isResuming ? 'Resume Quiz 🚀' : 'Start Quiz 🚀'}
                             </motion.button>
                             <Link to="/dashboard">
                                 <motion.button className="btn-secondary btn-lg" whileHover={{ scale: 1.02 }}>

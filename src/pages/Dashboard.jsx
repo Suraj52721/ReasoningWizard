@@ -21,6 +21,7 @@ export default function Dashboard() {
     const [tab, setTab] = useState('quizzes');
     const [quizzes, setQuizzes] = useState([]);
     const [attempts, setAttempts] = useState([]);
+    const [sessions, setSessions] = useState([]);
     const [leaderboard, setLeaderboard] = useState([]);
     const [loadingQuizzes, setLoadingQuizzes] = useState(true);
     const [editingProfile, setEditingProfile] = useState(false);
@@ -50,8 +51,14 @@ export default function Dashboard() {
             .select('*')
             .eq('user_id', user.id);
 
+        const { data: sessionsData } = await supabase
+            .from('quiz_sessions')
+            .select('*')
+            .eq('user_id', user.id);
+
         setQuizzes(quizzesData || []);
         setAttempts(attemptsData || []);
+        setSessions(sessionsData || []);
         setLoadingQuizzes(false);
     }
 
@@ -97,6 +104,7 @@ export default function Dashboard() {
     }, {});
 
     const getAttempt = (quizId) => attempts.find(a => a.quiz_id === quizId);
+    const getSession = (quizId) => sessions.find(s => s.quiz_id === quizId);
 
     const formatDate = (dateStr) => {
         const date = new Date(dateStr + 'T00:00:00');
@@ -162,6 +170,7 @@ export default function Dashboard() {
                                         <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
                                             {dateQuizzes.map((quiz, i) => {
                                                 const attempt = getAttempt(quiz.id);
+                                                const session = getSession(quiz.id);
                                                 return (
                                                     <motion.div key={quiz.id} className={`quiz-card glass-card ${attempt ? 'completed' : ''}`} variants={fadeUp} custom={i} whileHover={{ y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
                                                         <div className="quiz-card-header">
@@ -194,7 +203,7 @@ export default function Dashboard() {
                                                         ) : (
                                                             <Link to={`/quiz/${quiz.id}`}>
                                                                 <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }}>
-                                                                    <FiPlay /> Start Quiz
+                                                                    <FiPlay /> {session ? 'Resume Quiz' : 'Start Quiz'}
                                                                 </motion.button>
                                                             </Link>
                                                         )}

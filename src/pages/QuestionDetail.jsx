@@ -162,14 +162,21 @@ export default function QuestionDetail() {
                 </motion.div>
 
                 {/* Solution */}
-                {question.solution && (
+                {(question.solution || question.solution_image) && (
                     <motion.div className="qd-solution-section glass-card" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
                         <h2 className="qd-solution-heading">
                             <FiBookOpen /> Step-by-Step Solution
                         </h2>
-                        <div className="qd-solution-content">
-                            {question.solution}
-                        </div>
+                        {question.solution && (
+                            <div className="qd-solution-content">
+                                {question.solution}
+                            </div>
+                        )}
+                        {question.solution_image && (
+                            <div className="qd-solution-image" style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+                                <img src={question.solution_image} alt="Step-by-step solution visualization" style={{ maxWidth: '100%', borderRadius: '8px' }} />
+                            </div>
+                        )}
                     </motion.div>
                 )}
 

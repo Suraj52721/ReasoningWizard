@@ -5,6 +5,7 @@ import {
     FiPlus, FiTrash2, FiSave, FiCalendar, FiClock, FiList,
     FiEdit2, FiCheck, FiAlertTriangle, FiFileText, FiEye, FiX, FiImage, FiUpload
 } from 'react-icons/fi';
+import { compressImage } from '../utils/imageCompressor';
 import './Admin.css';
 
 const fadeUp = {
@@ -12,7 +13,7 @@ const fadeUp = {
     visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.4 } })
 };
 
-const SUBJECTS = ['Mathematics', 'Science', 'English', 'History', 'Geography', 'General Knowledge', 'Reasoning'];
+const SUBJECTS = ['Mathematics', 'Science', 'English', 'History', 'Geography', 'General Knowledge', 'Reasoning', 'Verbal Reasoning', 'Non-Verbal Reasoning'];
 
 function parseBulkQuestions(text) {
     const blocks = text.trim().split(/\n\s*\n/);
@@ -26,6 +27,8 @@ function parseBulkQuestions(text) {
         let correctOption = 0;
         let solution = '';
         let capturingSolution = false;
+
+        let solutionImage = null;
 
         for (const line of lines) {
             if (/^Q[:.)]\s*/i.test(line)) {
@@ -46,6 +49,9 @@ function parseBulkQuestions(text) {
                     solution = solText;
                 }
                 capturingSolution = true;
+            } else if (/^Sol?Image:\s*/i.test(line) || /^SolutionImage:\s*/i.test(line)) {
+                solutionImage = line.replace(/^Sol?Image:\s*/i, '').replace(/^SolutionImage:\s*/i, '').trim();
+                capturingSolution = false;
             } else if (capturingSolution) {
                 solution += (solution ? '\n' : '') + line;
             }
@@ -57,8 +63,11 @@ function parseBulkQuestions(text) {
                 options,
                 correct_option: correctOption,
                 solution: solution,
+                solution_image: solutionImage,
                 imageFile: null,
-                imagePreview: null
+                imagePreview: null,
+                solutionImageFile: null,
+                solutionImagePreview: null
             });
         }
     }
@@ -83,6 +92,7 @@ export default function Admin() {
     const [bulkText, setBulkText] = useState('');
     const [questions, setQuestions] = useState([]);
     const [showPreview, setShowPreview] = useState(false);
+    const [editingQuizId, setEditingQuizId] = useState(null);
 
     // State
     const [saving, setSaving] = useState(false);
@@ -103,6 +113,44 @@ export default function Admin() {
         setLoadingQuizzes(false);
     }
 
+    async function loadQuizForEditing(quiz) {
+        setLoadingQuizzes(true);
+        // Fetch full questions
+        const { data: qData, error } = await supabase.from('questions').select('*').eq('quiz_id', quiz.id).order('sort_order');
+        if (error) {
+            setMessage({ type: 'error', text: 'Failed to load quiz details.' });
+            setLoadingQuizzes(false);
+            return;
+        }
+
+        setTitle(quiz.title);
+        setSubject(quiz.subject);
+        setQuizDate(quiz.quiz_date);
+        setDuration(quiz.duration_minutes);
+        setNegativeMarking(quiz.negative_marking);
+        setNegativeMarks(quiz.negative_marks || 0.25);
+
+        const loadedQuestions = (qData || []).map(q => ({
+            id: q.id,
+            question_text: q.question_text,
+            options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+            correct_option: q.correct_option,
+            solution: q.solution,
+            solution_image: q.solution_image,
+            image_url: q.image_url,
+            imageFile: null,
+            imagePreview: q.image_url || null,
+            solutionImageFile: null,
+            solutionImagePreview: q.solution_image || null
+        }));
+
+        setQuestions(loadedQuestions);
+        setEditingQuizId(quiz.id);
+        setInputMode('manual');
+        setTab('create');
+        setLoadingQuizzes(false);
+    }
+
     function handleParseBulk() {
         const parsed = parseBulkQuestions(bulkText);
         if (parsed.length === 0) {
@@ -116,12 +164,17 @@ export default function Admin() {
 
     function addManualQuestion() {
         setQuestions([...questions, {
+            id: null,
             question_text: '',
             options: ['', '', '', ''],
             correct_option: 0,
             solution: '',
+            solution_image: null,
+            image_url: null,
             imageFile: null,
-            imagePreview: null
+            imagePreview: null,
+            solutionImageFile: null,
+            solutionImagePreview: null
         }]);
     }
 
@@ -131,20 +184,32 @@ export default function Admin() {
         setQuestions(updated);
     }
 
-    function handleImageSelect(index, e) {
+    function handleImageSelect(index, e, isSolution = false) {
         const file = e.target.files[0];
         if (file) {
             const updated = [...questions];
-            updated[index].imageFile = file;
-            updated[index].imagePreview = URL.createObjectURL(file);
+            if (isSolution) {
+                updated[index].solutionImageFile = file;
+                updated[index].solutionImagePreview = URL.createObjectURL(file);
+            } else {
+                updated[index].imageFile = file;
+                updated[index].imagePreview = URL.createObjectURL(file);
+            }
             setQuestions(updated);
         }
     }
 
-    function removeImage(index) {
+    function removeImage(index, isSolution = false) {
         const updated = [...questions];
-        updated[index].imageFile = null;
-        updated[index].imagePreview = null;
+        if (isSolution) {
+            updated[index].solutionImageFile = null;
+            updated[index].solutionImagePreview = null;
+            updated[index].solution_image = null; // Clear if it was from bulk paste
+        } else {
+            updated[index].imageFile = null;
+            updated[index].imagePreview = null;
+            updated[index].image_url = null;
+        }
         setQuestions(updated);
     }
 
@@ -190,41 +255,70 @@ export default function Admin() {
         setMessage(null);
 
         try {
-            // 1. Create quiz
-            console.log('Creating quiz...');
-            const { data: quizData, error: quizError } = await supabase
-                .from('quizzes')
-                .insert({
-                    title: title.trim(),
-                    subject,
-                    quiz_date: quizDate,
-                    duration_minutes: duration,
-                    negative_marking: negativeMarking,
-                    negative_marks: negativeMarking ? negativeMarks : 0,
-                })
-                .select()
-                .single();
+            // 1. Create or Update quiz
+            let quizData;
+            if (editingQuizId) {
+                console.log('Updating quiz...');
+                const { data, error: quizError } = await supabase
+                    .from('quizzes')
+                    .update({
+                        title: title.trim(),
+                        subject,
+                        quiz_date: quizDate,
+                        duration_minutes: duration,
+                        negative_marking: negativeMarking,
+                        negative_marks: negativeMarking ? negativeMarks : 0,
+                    })
+                    .eq('id', editingQuizId)
+                    .select()
+                    .single();
 
-            if (quizError) {
-                console.error('Quiz creation error:', quizError);
-                throw new Error(`Failed to create quiz: ${quizError.message}`);
+                if (quizError) {
+                    console.error('Quiz update error:', quizError);
+                    throw new Error(`Failed to update quiz: ${quizError.message}`);
+                }
+                quizData = data;
+                console.log('Quiz updated:', quizData);
+            } else {
+                console.log('Creating quiz...');
+                const { data, error: quizError } = await supabase
+                    .from('quizzes')
+                    .insert({
+                        title: title.trim(),
+                        subject,
+                        quiz_date: quizDate,
+                        duration_minutes: duration,
+                        negative_marking: negativeMarking,
+                        negative_marks: negativeMarking ? negativeMarks : 0,
+                    })
+                    .select()
+                    .single();
+
+                if (quizError) {
+                    console.error('Quiz creation error:', quizError);
+                    throw new Error(`Failed to create quiz: ${quizError.message}`);
+                }
+                quizData = data;
+                console.log('Quiz created:', quizData);
             }
-            console.log('Quiz created:', quizData);
 
             // 1. Upload images first
             let uploadedQuestions = [];
             console.log('Processing images...');
             try {
                 uploadedQuestions = await Promise.all(questions.map(async (q) => {
-                    let finalImageUrl = '';
+                    let finalImageUrl = q.image_url || '';
+                    let finalSolutionImageUrl = q.solution_image || ''; // Use linked URL if provided
+
                     if (q.imageFile) {
-                        const fileExt = q.imageFile.name.split('.').pop();
+                        const compressedFile = await compressImage(q.imageFile, 1200, 1200, 0.7);
+                        const fileExt = compressedFile.name.split('.').pop();
                         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
                         const { error: uploadError } = await supabase.storage
                             .from('quiz_images')
-                            .upload(fileName, q.imageFile);
+                            .upload(fileName, compressedFile);
 
-                        if (uploadError) throw new Error(`Image upload failed: ${uploadError.message}`);
+                        if (uploadError) throw new Error(`Question image upload failed: ${uploadError.message}`);
 
                         const { data } = supabase.storage
                             .from('quiz_images')
@@ -232,13 +326,33 @@ export default function Admin() {
 
                         finalImageUrl = data.publicUrl;
                     }
+
+                    if (q.solutionImageFile) {
+                        const compressedFile = await compressImage(q.solutionImageFile, 1200, 1200, 0.7);
+                        const fileExt = compressedFile.name.split('.').pop();
+                        const fileName = `sol-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+                        const { error: uploadError } = await supabase.storage
+                            .from('quiz_images')
+                            .upload(fileName, compressedFile);
+
+                        if (uploadError) throw new Error(`Solution image upload failed: ${uploadError.message}`);
+
+                        const { data } = supabase.storage
+                            .from('quiz_images')
+                            .getPublicUrl(fileName);
+
+                        finalSolutionImageUrl = data.publicUrl;
+                    }
+
                     return {
+                        id: q.id,
                         quiz_id: quizData.id,
                         question_text: q.question_text.trim(),
                         options: q.options.filter(o => o.trim()),
                         correct_option: q.correct_option,
                         solution: q.solution?.trim() || '',
                         image_url: finalImageUrl,
+                        solution_image: finalSolutionImageUrl,
                     };
                 }));
             } catch (err) {
@@ -248,22 +362,44 @@ export default function Admin() {
                 throw err;
             }
 
-            // 2. Insert questions with sorting
-            const questionsPayload = uploadedQuestions.map((q, i) => ({
-                ...q,
-                sort_order: i + 1,
-            }));
+            // 2. Insert/Update questions with sorting
+            const questionsPayload = uploadedQuestions.map((q, i) => {
+                const payload = {
+                    ...q,
+                    sort_order: i + 1,
+                };
+                if (!payload.id) {
+                    delete payload.id;
+                }
+                return payload;
+            });
 
-            console.log('Inserting questions:', questionsPayload);
-            const { error: qError } = await supabase.from('questions').insert(questionsPayload);
+            // Delete questions that were removed in edit mode
+            if (editingQuizId) {
+                const keepIds = questionsPayload.map(q => q.id).filter(Boolean);
+                if (keepIds.length > 0) {
+                    await supabase.from('questions')
+                        .delete()
+                        .eq('quiz_id', editingQuizId)
+                        .not('id', 'in', `(${keepIds.join(',')})`);
+                } else {
+                    await supabase.from('questions')
+                        .delete()
+                        .eq('quiz_id', editingQuizId);
+                }
+            }
+
+            console.log('Upserting questions:', questionsPayload);
+            const { error: qError } = await supabase.from('questions').upsert(questionsPayload);
 
             if (qError) {
                 console.error('Question insertion error:', qError);
-                throw new Error(`Quiz created but failed to add questions: ${qError.message}`);
+                throw new Error(`Quiz saved but failed to update questions: ${qError.message}`);
             }
 
-            setMessage({ type: 'success', text: `Quiz "${title}" published with ${questions.length} questions!` });
+            setMessage({ type: 'success', text: `Quiz "${title}" ${editingQuizId ? 'updated' : 'published'} with ${questions.length} questions!` });
             // Reset form
+            setEditingQuizId(null);
             setTitle('');
             setSubject('Mathematics');
             setDuration(10);
@@ -393,7 +529,7 @@ export default function Admin() {
                                     <div className="bulk-section">
                                         <p className="helper-text">
                                             Format: Question text on one line, then options A, B, C, D. Mark correct option with *.
-                                            Add optional "Solution:" or "Exp:" line. Separate questions with a blank line.
+                                            Add optional "Solution:" or "Exp:" line. Add optional "SolImage:" line with URL. Separate questions with a blank line.
                                         </p>
                                         <pre className="format-example">
                                             {`Q1. Which shape has 3 sides?
@@ -403,7 +539,7 @@ C: Triangle*
 D: Rectangle
 Solution:
 A triangle is a polygon with three edges and three vertices.
-It is one of the basic shapes in geometry.
+SolImage: https://example.com/triangle.png
 
 Q2. What is 5 x 5?
 A: 20
@@ -486,6 +622,28 @@ Exp: 5 times 5 equals 25.`}
                                                         value={q.solution || ''}
                                                         onChange={e => updateQuestion(qi, 'solution', e.target.value)}
                                                     />
+
+                                                    <div className="mq-image-row" style={{ marginTop: '0.8rem' }}>
+                                                        <label className="file-upload-label">
+                                                            <FiUpload /> Upload Solution Image
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                onChange={e => handleImageSelect(qi, e, true)}
+                                                            />
+                                                        </label>
+                                                        {(q.solutionImagePreview || q.solution_image) && (
+                                                            <span className="file-name">{q.solutionImageFile?.name || 'Linked Image'}</span>
+                                                        )}
+                                                    </div>
+                                                    {(q.solutionImagePreview || q.solution_image) && (
+                                                        <div className="mq-image-preview">
+                                                            <img src={q.solutionImagePreview || q.solution_image} alt="Solution Preview" />
+                                                            <button className="remove-img-btn" onClick={() => removeImage(qi, true)}>
+                                                                <FiTrash2 />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </motion.div>
                                         ))}
@@ -535,15 +693,28 @@ Exp: 5 times 5 equals 25.`}
                                         <span>{subject} · {duration} min · {questions.length} questions</span>
                                         {negativeMarking && <span className="neg-badge"><FiAlertTriangle /> −{negativeMarks} per wrong answer</span>}
                                     </div>
-                                    <motion.button
-                                        className="btn-primary publish-btn"
-                                        onClick={handlePublish}
-                                        disabled={saving}
-                                        whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(245,197,24,0.4)' }}
-                                        whileTap={{ scale: 0.97 }}
-                                    >
-                                        {saving ? 'Publishing...' : <><FiSave /> Publish Quiz</>}
-                                    </motion.button>
+                                    <div className="publish-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                        {editingQuizId && (
+                                            <motion.button className="btn-secondary" onClick={() => {
+                                                setEditingQuizId(null);
+                                                setTitle('');
+                                                setQuestions([]);
+                                                setBulkText('');
+                                                setInputMode('bulk');
+                                            }} whileHover={{ scale: 1.02 }}>
+                                                Cancel Edit
+                                            </motion.button>
+                                        )}
+                                        <motion.button
+                                            className="btn-primary publish-btn"
+                                            onClick={handlePublish}
+                                            disabled={saving}
+                                            whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(245,197,24,0.4)' }}
+                                            whileTap={{ scale: 0.97 }}
+                                        >
+                                            {saving ? 'Publishing...' : <><FiSave /> {editingQuizId ? 'Update Quiz' : 'Publish Quiz'}</>}
+                                        </motion.button>
+                                    </div>
                                 </motion.div>
                             )}
                         </motion.div>
@@ -583,14 +754,26 @@ Exp: 5 times 5 equals 25.`}
                                                         {quiz.negative_marking && <span className="neg-badge"><FiAlertTriangle /> −{quiz.negative_marks}</span>}
                                                     </div>
                                                 </div>
-                                                <motion.button
-                                                    className="btn-delete"
-                                                    onClick={() => deleteQuiz(quiz.id)}
-                                                    whileHover={{ scale: 1.05 }}
-                                                    whileTap={{ scale: 0.95 }}
-                                                >
-                                                    <FiTrash2 />
-                                                </motion.button>
+                                                <div className="manage-card-actions" style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <motion.button
+                                                        className="btn-secondary"
+                                                        onClick={() => loadQuizForEditing(quiz)}
+                                                        whileHover={{ scale: 1.05 }}
+                                                        whileTap={{ scale: 0.95 }}
+                                                        title="Edit Quiz"
+                                                    >
+                                                        <FiEdit2 />
+                                                    </motion.button>
+                                                    <motion.button
+                                                        className="btn-delete"
+                                                        onClick={() => deleteQuiz(quiz.id)}
+                                                        whileHover={{ scale: 1.05 }}
+                                                        whileTap={{ scale: 0.95 }}
+                                                        title="Delete Quiz"
+                                                    >
+                                                        <FiTrash2 />
+                                                    </motion.button>
+                                                </div>
                                             </motion.div>
                                         ))}
                                     </div>

@@ -165,7 +165,7 @@ export default function QuizSolutions() {
                                 </div>
 
                                 {/* View Solution Expander */}
-                                {q.solution && (
+                                {(q.solution || q.solution_image) && (
                                     <>
                                         <button
                                             className="sol-expand-btn"
@@ -183,9 +183,16 @@ export default function QuizSolutions() {
                                                     exit={{ opacity: 0, height: 0 }}
                                                     transition={{ duration: 0.3 }}
                                                 >
-                                                    <div className="sol-explanation-content">
-                                                        {q.solution}
-                                                    </div>
+                                                    {q.solution && (
+                                                        <div className="sol-explanation-content">
+                                                            {q.solution}
+                                                        </div>
+                                                    )}
+                                                    {q.solution_image && (
+                                                        <div className="sol-explanation-image">
+                                                            <img src={q.solution_image} alt="Solution detailed diagram" style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '1rem' }} />
+                                                        </div>
+                                                    )}
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
