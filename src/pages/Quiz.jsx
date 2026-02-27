@@ -104,7 +104,7 @@ export default function Quiz() {
 
     // Fetch quiz data
     async function fetchQuiz() {
-        const { data: quizData, error: quizError } = await supabase.from('quizzes').select('*').eq('id', id).single();
+        const { data: quizData, error: quizError } = await supabase.from('quizzes').select('*').eq('id', id).neq('is_draft', true).single();
         const { data: questionsData, error: questionsError } = await supabase.from('questions').select('*').eq('quiz_id', id).order('sort_order');
         const { data: attemptData, error: attemptError } = await supabase.from('quiz_attempts').select('*').eq('quiz_id', id).eq('user_id', user.id).maybeSingle();
         const { data: sessionData, error: sessionError } = await supabase.from('quiz_sessions').select('*').eq('quiz_id', id).eq('user_id', user.id).maybeSingle();

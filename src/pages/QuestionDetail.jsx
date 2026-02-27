@@ -44,6 +44,7 @@ export default function QuestionDetail() {
                 .from('quizzes')
                 .select('id, title, subject')
                 .eq('id', qData.quiz_id)
+                .neq('is_draft', true)
                 .single();
 
             setQuiz(quizData);

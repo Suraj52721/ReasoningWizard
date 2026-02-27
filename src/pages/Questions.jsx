@@ -32,6 +32,7 @@ export default function Questions() {
             const { data: quizData } = await supabase
                 .from('quizzes')
                 .select('id, title, subject')
+                .neq('is_draft', true)
                 .order('quiz_date', { ascending: false });
 
             const quizMap = {};

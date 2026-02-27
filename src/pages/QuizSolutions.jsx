@@ -26,6 +26,7 @@ export default function QuizSolutions() {
                 .from('quizzes')
                 .select('*')
                 .eq('id', id)
+                .neq('is_draft', true)
                 .single();
             setQuiz(quizData);
 

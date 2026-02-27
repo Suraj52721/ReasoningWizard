@@ -44,6 +44,7 @@ export default function Dashboard() {
         const { data: quizzesData } = await supabase
             .from('quizzes')
             .select('*')
+            .neq('is_draft', true)
             .order('quiz_date', { ascending: false });
 
         const { data: attemptsData } = await supabase

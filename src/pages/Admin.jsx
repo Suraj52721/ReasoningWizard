@@ -226,8 +226,8 @@ export default function Admin() {
         setQuestions(questions.filter((_, i) => i !== index));
     }
 
-    async function handlePublish() {
-        console.log('handlePublish started');
+    async function handlePublish(isDraft = false) {
+        console.log('handlePublish started, isDraft:', isDraft);
 
         if (!title.trim()) {
             setMessage({ type: 'error', text: 'Please enter a quiz title.' });
@@ -268,6 +268,7 @@ export default function Admin() {
                         duration_minutes: duration,
                         negative_marking: negativeMarking,
                         negative_marks: negativeMarking ? negativeMarks : 0,
+                        is_draft: isDraft,
                     })
                     .eq('id', editingQuizId)
                     .select()
@@ -290,6 +291,7 @@ export default function Admin() {
                         duration_minutes: duration,
                         negative_marking: negativeMarking,
                         negative_marks: negativeMarking ? negativeMarks : 0,
+                        is_draft: isDraft,
                     })
                     .select()
                     .single();
@@ -397,7 +399,7 @@ export default function Admin() {
                 throw new Error(`Quiz saved but failed to update questions: ${qError.message}`);
             }
 
-            setMessage({ type: 'success', text: `Quiz "${title}" ${editingQuizId ? 'updated' : 'published'} with ${questions.length} questions!` });
+            setMessage({ type: 'success', text: `Quiz "${title}" ${isDraft ? 'saved as draft' : (editingQuizId ? 'updated' : 'published')} with ${questions.length} questions!` });
             // Reset form
             setEditingQuizId(null);
             setTitle('');
@@ -706,13 +708,23 @@ Exp: 5 times 5 equals 25.`}
                                             </motion.button>
                                         )}
                                         <motion.button
+                                            className="btn-secondary draft-btn"
+                                            onClick={() => handlePublish(true)}
+                                            disabled={saving}
+                                            whileHover={{ scale: 1.03 }}
+                                            whileTap={{ scale: 0.97 }}
+                                            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)' }}
+                                        >
+                                            {saving ? 'Saving...' : <><FiSave /> Save Draft</>}
+                                        </motion.button>
+                                        <motion.button
                                             className="btn-primary publish-btn"
-                                            onClick={handlePublish}
+                                            onClick={() => handlePublish(false)}
                                             disabled={saving}
                                             whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(245,197,24,0.4)' }}
                                             whileTap={{ scale: 0.97 }}
                                         >
-                                            {saving ? 'Publishing...' : <><FiSave /> {editingQuizId ? 'Update Quiz' : 'Publish Quiz'}</>}
+                                            {saving ? 'Publishing...' : <><FiCheck /> {editingQuizId ? 'Update Public' : 'Publish Quiz'}</>}
                                         </motion.button>
                                     </div>
                                 </motion.div>
@@ -748,6 +760,7 @@ Exp: 5 times 5 equals 25.`}
                                                     <h3>{quiz.title}</h3>
                                                     <div className="manage-meta">
                                                         <span className="manage-badge">{quiz.subject}</span>
+                                                        {quiz.is_draft && <span className="manage-badge" style={{ background: 'rgba(255,165,0,0.1)', color: 'orange', borderColor: 'rgba(255,165,0,0.2)' }}>Draft</span>}
                                                         <span><FiCalendar /> {quiz.quiz_date}</span>
                                                         <span><FiClock /> {quiz.duration_minutes} min</span>
                                                         <span><FiFileText /> {quiz.questions?.[0]?.count || 0} questions</span>
