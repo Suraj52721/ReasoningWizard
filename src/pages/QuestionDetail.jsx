@@ -147,6 +147,11 @@ export default function QuestionDetail() {
                 <motion.div className="qd-question-card glass-card" variants={fadeUp} initial="hidden" animate="visible">
                     <div className="qd-question-label">Question</div>
                     <h1 className="qd-question-text">{question.question_text}</h1>
+                    {question.image_url && (
+                        <div className="qd-question-image" style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+                            <img src={question.image_url} alt="Question Diagram" style={{ maxWidth: '100%', borderRadius: '8px' }} />
+                        </div>
+                    )}
                 </motion.div>
 
                 {/* Options */}
