@@ -130,19 +130,33 @@ export default function Admin() {
         setNegativeMarking(quiz.negative_marking);
         setNegativeMarks(quiz.negative_marks || 0.25);
 
-        const loadedQuestions = (qData || []).map(q => ({
-            id: q.id,
-            question_text: q.question_text,
-            options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
-            correct_option: q.correct_option,
-            solution: q.solution,
-            solution_image: q.solution_image,
-            image_url: q.image_url,
-            imageFile: null,
-            imagePreview: q.image_url || null,
-            solutionImageFile: null,
-            solutionImagePreview: q.solution_image || null
-        }));
+        const loadedQuestions = (qData || []).map(q => {
+            let parsedOpts = q.options;
+            if (typeof parsedOpts === 'string') {
+                try {
+                    parsedOpts = JSON.parse(parsedOpts);
+                } catch (e) {
+                    parsedOpts = ['', '', '', ''];
+                }
+            }
+            if (!Array.isArray(parsedOpts)) {
+                parsedOpts = ['', '', '', ''];
+            }
+
+            return {
+                id: q.id,
+                question_text: q.question_text || '',
+                options: parsedOpts,
+                correct_option: q.correct_option || 0,
+                solution: q.solution || '',
+                solution_image: q.solution_image || null,
+                image_url: q.image_url || null,
+                imageFile: null,
+                imagePreview: q.image_url || null,
+                solutionImageFile: null,
+                solutionImagePreview: q.solution_image || null
+            };
+        });
 
         setQuestions(loadedQuestions);
         setEditingQuizId(quiz.id);
@@ -584,7 +598,9 @@ Exp: 5 times 5 equals 25.`}
                                                             onChange={e => handleImageSelect(qi, e)}
                                                         />
                                                     </label>
-                                                    {q.imagePreview && <span className="file-name">{q.imageFile.name}</span>}
+                                                    {(q.imagePreview || q.image_url) && (
+                                                        <span className="file-name">{q.imageFile?.name || 'Linked Image'}</span>
+                                                    )}
                                                 </div>
                                                 {q.imagePreview && (
                                                     <div className="mq-image-preview">
