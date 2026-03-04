@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 import {
     FiPlus, FiTrash2, FiSave, FiCalendar, FiClock, FiList,
-    FiEdit2, FiCheck, FiAlertTriangle, FiFileText, FiEye, FiX, FiImage, FiUpload
+    FiEdit2, FiCheck, FiAlertTriangle, FiFileText, FiEye, FiX, FiImage, FiUpload,
+    FiUsers, FiGlobe, FiMonitor, FiSearch, FiChevronLeft, FiChevronRight,
+    FiFilter, FiBarChart2, FiArrowUp, FiArrowDown, FiLock, FiSmartphone
 } from 'react-icons/fi';
 import { compressImage } from '../utils/imageCompressor';
 import './Admin.css';
@@ -75,7 +78,9 @@ function parseBulkQuestions(text) {
 }
 
 export default function Admin() {
-    const [tab, setTab] = useState('create');
+    const { profile } = useAuth();
+    const isReadOnly = profile?.admin_role === 'read_only_admin';
+    const [tab, setTab] = useState(isReadOnly ? 'manage' : 'create');
     const [quizzes, setQuizzes] = useState([]);
     const [loadingQuizzes, setLoadingQuizzes] = useState(true);
 
@@ -98,9 +103,22 @@ export default function Admin() {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState(null);
 
+    // Visitor analytics state
+    const [visitors, setVisitors] = useState([]);
+    const [visitorStats, setVisitorStats] = useState({ total: 0, unique: 0, today: 0, loggedIn: 0 });
+    const [loadingVisitors, setLoadingVisitors] = useState(false);
+    const [visitorSearch, setVisitorSearch] = useState('');
+    const [visitorPage, setVisitorPage] = useState(0);
+    const [visitorSort, setVisitorSort] = useState({ field: 'visited_at', dir: 'desc' });
+    const VISITORS_PER_PAGE = 15;
+
     useEffect(() => {
         fetchQuizzes();
     }, []);
+
+    useEffect(() => {
+        if (tab === 'visitors') fetchVisitors();
+    }, [tab]);
 
     async function fetchQuizzes() {
         setLoadingQuizzes(true);
@@ -445,17 +463,100 @@ export default function Admin() {
         }
     }
 
+    // ── Visitor Analytics Functions ──
+    async function fetchVisitors() {
+        setLoadingVisitors(true);
+        try {
+            const { data, error } = await supabase
+                .from('site_visitors')
+                .select('*')
+                .order('visited_at', { ascending: false })
+                .limit(500);
+            if (error) throw error;
+            const v = data || [];
+            setVisitors(v);
+
+            // Calculate stats
+            const today = new Date().toISOString().split('T')[0];
+            const fingerprints = new Set(v.filter(r => r.visitor_fingerprint).map(r => r.visitor_fingerprint));
+            setVisitorStats({
+                total: v.length,
+                unique: fingerprints.size,
+                today: v.filter(r => r.visited_at && r.visited_at.startsWith(today)).length,
+                loggedIn: v.filter(r => r.is_logged_in).length,
+            });
+        } catch (err) {
+            console.error('Failed to fetch visitors:', err);
+        } finally {
+            setLoadingVisitors(false);
+        }
+    }
+
+    // Filtered & sorted visitors
+    const filteredVisitors = useMemo(() => {
+        let result = [...visitors];
+        if (visitorSearch.trim()) {
+            const q = visitorSearch.toLowerCase();
+            result = result.filter(v =>
+                (v.page_url || '').toLowerCase().includes(q) ||
+                (v.browser || '').toLowerCase().includes(q) ||
+                (v.os || '').toLowerCase().includes(q) ||
+                (v.country || '').toLowerCase().includes(q) ||
+                (v.referrer_url || '').toLowerCase().includes(q) ||
+                (v.utm_source || '').toLowerCase().includes(q) ||
+                (v.user_email || '').toLowerCase().includes(q) ||
+                (v.device_type || '').toLowerCase().includes(q)
+            );
+        }
+        result.sort((a, b) => {
+            const aVal = a[visitorSort.field] || '';
+            const bVal = b[visitorSort.field] || '';
+            const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+            return visitorSort.dir === 'asc' ? cmp : -cmp;
+        });
+        return result;
+    }, [visitors, visitorSearch, visitorSort]);
+
+    const pagedVisitors = filteredVisitors.slice(visitorPage * VISITORS_PER_PAGE, (visitorPage + 1) * VISITORS_PER_PAGE);
+    const totalVisitorPages = Math.ceil(filteredVisitors.length / VISITORS_PER_PAGE);
+
+    function toggleVisitorSort(field) {
+        setVisitorSort(prev => ({
+            field,
+            dir: prev.field === field && prev.dir === 'desc' ? 'asc' : 'desc',
+        }));
+        setVisitorPage(0);
+    }
+
+    // Get top N items from a field
+    function getTopItems(field, n = 5) {
+        const counts = {};
+        visitors.forEach(v => {
+            const val = v[field];
+            if (val) counts[val] = (counts[val] || 0) + 1;
+        });
+        return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, n);
+    }
+
     const tabs = [
-        { id: 'create', label: 'Create Quiz', icon: <FiPlus /> },
+        ...(!isReadOnly ? [{ id: 'create', label: 'Create Quiz', icon: <FiPlus /> }] : [{ id: 'create', label: 'Edit Quiz', icon: <FiEdit2 /> }]),
         { id: 'manage', label: 'Manage Quizzes', icon: <FiList /> },
+        { id: 'visitors', label: 'Visitors', icon: <FiUsers /> },
     ];
 
     return (
         <div className="admin-page page-container">
             <div className="admin-inner">
                 <motion.div className="admin-header" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-                    <h1 className="admin-title">Admin <span className="text-gradient">Panel</span> 🛠️</h1>
-                    <p className="admin-subtitle">Create and manage daily quizzes for all students.</p>
+                    <h1 className="admin-title">
+                        Admin <span className="text-gradient">Panel</span> 🛠️
+                        {isReadOnly && <span className="readonly-badge"><FiLock /> Read-Only</span>}
+                    </h1>
+                    <p className="admin-subtitle">
+                        {isReadOnly
+                            ? 'You have read-only access to the admin panel.'
+                            : 'Create and manage daily quizzes for all students.'}
+                    </p>
                 </motion.div>
 
                 {/* Message */}
@@ -581,7 +682,7 @@ Exp: 5 times 5 equals 25.`}
                                             <motion.div key={qi} className="manual-question" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                                                 <div className="mq-header">
                                                     <span className="mq-num">Q{qi + 1}</span>
-                                                    <button className="mq-delete" onClick={() => removeQuestion(qi)}><FiTrash2 /></button>
+                                                    {!isReadOnly && <button className="mq-delete" onClick={() => removeQuestion(qi)}><FiTrash2 /></button>}
                                                 </div>
                                                 <input
                                                     className="admin-input"
@@ -793,21 +894,208 @@ Exp: 5 times 5 equals 25.`}
                                                     >
                                                         <FiEdit2 />
                                                     </motion.button>
-                                                    <motion.button
-                                                        className="btn-delete"
-                                                        onClick={() => deleteQuiz(quiz.id)}
-                                                        whileHover={{ scale: 1.05 }}
-                                                        whileTap={{ scale: 0.95 }}
-                                                        title="Delete Quiz"
-                                                    >
-                                                        <FiTrash2 />
-                                                    </motion.button>
+                                                    {!isReadOnly && (
+                                                        <motion.button
+                                                            className="btn-delete"
+                                                            onClick={() => deleteQuiz(quiz.id)}
+                                                            whileHover={{ scale: 1.05 }}
+                                                            whileTap={{ scale: 0.95 }}
+                                                            title="Delete Quiz"
+                                                        >
+                                                            <FiTrash2 />
+                                                        </motion.button>
+                                                    )}
                                                 </div>
                                             </motion.div>
                                         ))}
                                     </div>
                                 )}
                             </div>
+                        </motion.div>
+                    )}
+
+                    {tab === 'visitors' && (
+                        <motion.div key="visitors" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+                            {/* Stats Cards */}
+                            <div className="visitor-stats-grid">
+                                {[
+                                    { label: 'Total Visits', value: visitorStats.total, icon: <FiBarChart2 />, color: 'var(--primary)' },
+                                    { label: 'Unique Visitors', value: visitorStats.unique, icon: <FiUsers />, color: 'var(--success)' },
+                                    { label: "Today's Visits", value: visitorStats.today, icon: <FiCalendar />, color: 'var(--warning)' },
+                                    { label: 'Logged-In Users', value: visitorStats.loggedIn, icon: <FiLock />, color: '#8B5CF6' },
+                                ].map((card, i) => (
+                                    <motion.div
+                                        key={card.label}
+                                        className="visitor-stat-card glass-card"
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: i * 0.08 }}
+                                    >
+                                        <div className="stat-icon" style={{ color: card.color, background: `${card.color}15` }}>
+                                            {card.icon}
+                                        </div>
+                                        <div className="stat-info">
+                                            <span className="stat-value">{card.value}</span>
+                                            <span className="stat-label">{card.label}</span>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+
+                            {/* Top Items */}
+                            <div className="visitor-top-grid">
+                                {[
+                                    { title: 'Top Browsers', field: 'browser', icon: <FiGlobe /> },
+                                    { title: 'Top Devices', field: 'device_type', icon: <FiSmartphone /> },
+                                    { title: 'Top Pages', field: 'page_url', icon: <FiFileText /> },
+                                    { title: 'Top Referrers', field: 'referrer_url', icon: <FiArrowUp /> },
+                                ].map((section, i) => (
+                                    <motion.div
+                                        key={section.title}
+                                        className="top-items-card glass-card"
+                                        initial={{ opacity: 0, y: 15 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.3 + i * 0.08 }}
+                                    >
+                                        <h3 className="top-items-title">{section.icon} {section.title}</h3>
+                                        <div className="top-items-list">
+                                            {getTopItems(section.field).length === 0 ? (
+                                                <span className="top-item-empty">No data yet</span>
+                                            ) : (
+                                                getTopItems(section.field).map(([name, count], j) => (
+                                                    <div key={j} className="top-item-row">
+                                                        <span className="top-item-name" title={name}>{name || '(direct)'}</span>
+                                                        <span className="top-item-count">{count}</span>
+                                                        <div className="top-item-bar">
+                                                            <div
+                                                                className="top-item-bar-fill"
+                                                                style={{ width: `${Math.min(100, (count / (getTopItems(section.field)[0]?.[1] || 1)) * 100)}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+
+                            {/* Visitor Data Table */}
+                            <motion.div
+                                className="visitor-table-section glass-card"
+                                initial={{ opacity: 0, y: 15 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.5 }}
+                            >
+                                <div className="visitor-table-header">
+                                    <h3 className="form-section-title"><FiList /> Visitor Log</h3>
+                                    <div className="visitor-search">
+                                        <FiSearch />
+                                        <input
+                                            className="admin-input"
+                                            placeholder="Search visitors..."
+                                            value={visitorSearch}
+                                            onChange={e => { setVisitorSearch(e.target.value); setVisitorPage(0); }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {loadingVisitors ? (
+                                    <div className="loading-state">
+                                        <motion.div className="spinner" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
+                                        <p>Loading visitors...</p>
+                                    </div>
+                                ) : filteredVisitors.length === 0 ? (
+                                    <div className="empty-state">
+                                        <FiUsers />
+                                        <h3>No visitor data</h3>
+                                        <p>{visitorSearch ? 'No results match your search.' : 'Visitor data will appear here once tracking is active.'}</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="visitor-table-wrapper">
+                                            <table className="visitor-table">
+                                                <thead>
+                                                    <tr>
+                                                        {[
+                                                            { key: 'visited_at', label: 'Date' },
+                                                            { key: 'page_url', label: 'Page' },
+                                                            { key: 'browser', label: 'Browser' },
+                                                            { key: 'os', label: 'OS' },
+                                                            { key: 'device_type', label: 'Device' },
+                                                            { key: 'country', label: 'Country' },
+                                                            { key: 'referrer_url', label: 'Referrer' },
+                                                            { key: 'utm_source', label: 'UTM' },
+                                                            { key: 'is_logged_in', label: 'User' },
+                                                        ].map(col => (
+                                                            <th
+                                                                key={col.key}
+                                                                className={`sortable-th ${visitorSort.field === col.key ? 'sorted' : ''}`}
+                                                                onClick={() => toggleVisitorSort(col.key)}
+                                                            >
+                                                                {col.label}
+                                                                {visitorSort.field === col.key && (
+                                                                    visitorSort.dir === 'desc' ? <FiArrowDown /> : <FiArrowUp />
+                                                                )}
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {pagedVisitors.map((v, i) => (
+                                                        <tr key={v.id || i}>
+                                                            <td className="td-date">
+                                                                {v.visited_at ? new Date(v.visited_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                            </td>
+                                                            <td className="td-page" title={v.page_url}>{v.page_url || '—'}</td>
+                                                            <td>{v.browser || '—'}</td>
+                                                            <td>{v.os || '—'}</td>
+                                                            <td>
+                                                                <span className={`device-badge ${v.device_type}`}>
+                                                                    {v.device_type === 'mobile' ? <FiSmartphone /> : v.device_type === 'tablet' ? <FiMonitor /> : <FiMonitor />}
+                                                                    {v.device_type || '—'}
+                                                                </span>
+                                                            </td>
+                                                            <td>{v.country || '—'}</td>
+                                                            <td className="td-referrer" title={v.referrer_url}>{v.referrer_url ? (() => { try { return new URL(v.referrer_url).hostname; } catch { return v.referrer_url; } })() : '(direct)'}</td>
+                                                            <td>{v.utm_source || '—'}</td>
+                                                            <td>
+                                                                {v.is_logged_in
+                                                                    ? <span className="user-badge logged-in" title={v.user_email}><FiCheck /> {v.user_email ? v.user_email.split('@')[0] : 'User'}</span>
+                                                                    : <span className="user-badge anonymous">Anonymous</span>
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Pagination */}
+                                        {totalVisitorPages > 1 && (
+                                            <div className="visitor-pagination">
+                                                <button
+                                                    className="pagination-btn"
+                                                    disabled={visitorPage === 0}
+                                                    onClick={() => setVisitorPage(p => p - 1)}
+                                                >
+                                                    <FiChevronLeft />
+                                                </button>
+                                                <span className="pagination-info">
+                                                    Page {visitorPage + 1} of {totalVisitorPages} ({filteredVisitors.length} results)
+                                                </span>
+                                                <button
+                                                    className="pagination-btn"
+                                                    disabled={visitorPage >= totalVisitorPages - 1}
+                                                    onClick={() => setVisitorPage(p => p + 1)}
+                                                >
+                                                    <FiChevronRight />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </motion.div>
                         </motion.div>
                     )}
                 </AnimatePresence>

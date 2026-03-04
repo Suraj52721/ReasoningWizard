@@ -3,10 +3,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import CookieConsent from './CookieConsent';
+import { useAuth } from '../context/AuthContext';
+import { trackVisit, resetTrackingFlag } from '../utils/visitorTracker';
 
 export default function Layout({ children }) {
     const location = useLocation();
     const [quizFocus, setQuizFocus] = useState(false);
+    const { user } = useAuth();
 
     useEffect(() => {
         const check = () => setQuizFocus(document.body.classList.contains('quiz-focus'));
@@ -15,6 +19,19 @@ export default function Layout({ children }) {
         observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
         return () => observer.disconnect();
     }, []);
+
+    // Track visitor on first load and on cookie consent change
+    useEffect(() => {
+        trackVisit(user);
+
+        function handleConsentChange() {
+            resetTrackingFlag();
+            trackVisit(user);
+        }
+
+        window.addEventListener('cookieConsentChanged', handleConsentChange);
+        return () => window.removeEventListener('cookieConsentChanged', handleConsentChange);
+    }, [user]);
 
     return (
         <>
@@ -31,6 +48,7 @@ export default function Layout({ children }) {
                 </motion.main>
             </AnimatePresence>
             {!quizFocus && <Footer />}
+            <CookieConsent />
         </>
     );
 }
