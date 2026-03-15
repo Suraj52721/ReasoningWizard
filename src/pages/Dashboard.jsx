@@ -97,26 +97,8 @@ export default function Dashboard() {
         setEditingProfile(false);
     };
 
-    const groupedQuizzes = quizzes.reduce((acc, quiz) => {
-        const date = quiz.quiz_date;
-        if (!acc[date]) acc[date] = [];
-        acc[date].push(quiz);
-        return acc;
-    }, {});
-
     const getAttempt = (quizId) => attempts.find(a => a.quiz_id === quizId);
     const getSession = (quizId) => sessions.find(s => s.quiz_id === quizId);
-
-    const formatDate = (dateStr) => {
-        const date = new Date(dateStr + 'T00:00:00');
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        if (dateStr === today.toISOString().split('T')[0]) return '📅 Today';
-        if (dateStr === tomorrow.toISOString().split('T')[0]) return '📅 Tomorrow';
-        return date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    };
 
     const tabs = [
         { id: 'quizzes', label: 'Daily Quizzes', icon: <FiBook /> },
@@ -158,62 +140,57 @@ export default function Dashboard() {
                                     <motion.div className="spinner" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
                                     <p>Loading quizzes...</p>
                                 </div>
-                            ) : Object.keys(groupedQuizzes).length === 0 ? (
+                            ) : quizzes.length === 0 ? (
                                 <div className="empty-state glass-card">
                                     <FiCalendar />
                                     <h3>No quizzes available</h3>
                                     <p>Check back later for new daily quizzes!</p>
                                 </div>
                             ) : (
-                                Object.entries(groupedQuizzes).map(([date, dateQuizzes]) => (
-                                    <div key={date} className="quiz-date-group">
-                                        <h3 className="date-heading">{formatDate(date)}</h3>
-                                        <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
-                                            {dateQuizzes.map((quiz, i) => {
-                                                const attempt = getAttempt(quiz.id);
-                                                const session = getSession(quiz.id);
-                                                return (
-                                                    <motion.div key={quiz.id} className={`quiz-card glass-card ${attempt ? 'completed' : ''}`} variants={fadeUp} custom={i} whileHover={{ y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
-                                                        <div className="quiz-card-header">
-                                                            <div className="quiz-subject-badge">{quiz.subject}</div>
-                                                            {attempt && <div className="completed-badge"><FiCheckCircle /> Done</div>}
-                                                        </div>
-                                                        <h4 className="quiz-card-title">{quiz.title}</h4>
-                                                        <div className="quiz-card-meta">
-                                                            <span><FiClock /> {quiz.duration_minutes} min</span>
-                                                            {attempt && <span><FiAward /> {attempt.score}/{attempt.total_questions}</span>}
-                                                        </div>
-                                                        {attempt ? (
-                                                            <div className="quiz-card-actions">
-                                                                <Link to={`/quiz/${quiz.id}`}>
-                                                                    <motion.button className="btn-secondary quiz-btn" whileHover={{ scale: 1.02 }}>
-                                                                        View Results
-                                                                    </motion.button>
-                                                                </Link>
-                                                                <motion.button
-                                                                    className="btn-primary quiz-btn reattempt-dashboard-btn"
-                                                                    whileHover={{ scale: 1.02 }}
-                                                                    onClick={async () => {
-                                                                        await supabase.from('quiz_attempts').delete().eq('id', attempt.id);
-                                                                        navigate(`/quiz/${quiz.id}?reattempt=true`);
-                                                                    }}
-                                                                >
-                                                                    <FiRefreshCw /> Re-attempt
-                                                                </motion.button>
-                                                            </div>
-                                                        ) : (
-                                                            <Link to={`/quiz/${quiz.id}`}>
-                                                                <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }}>
-                                                                    <FiPlay /> {session ? 'Resume Quiz' : 'Start Quiz'}
-                                                                </motion.button>
-                                                            </Link>
-                                                        )}
-                                                    </motion.div>
-                                                );
-                                            })}
-                                        </motion.div>
-                                    </div>
-                                ))
+                                <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
+                                    {quizzes.map((quiz, i) => {
+                                        const attempt = getAttempt(quiz.id);
+                                        const session = getSession(quiz.id);
+                                        return (
+                                            <motion.div key={quiz.id} className={`quiz-card glass-card ${attempt ? 'completed' : ''}`} variants={fadeUp} custom={i} whileHover={{ y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
+                                                <div className="quiz-card-header">
+                                                    <div className="quiz-subject-badge">{quiz.subject}</div>
+                                                    {attempt && <div className="completed-badge"><FiCheckCircle /> Done</div>}
+                                                </div>
+                                                <h4 className="quiz-card-title">{quiz.title}</h4>
+                                                <div className="quiz-card-meta">
+                                                    <span><FiClock /> {quiz.duration_minutes} min</span>
+                                                    {attempt && <span><FiAward /> {attempt.score}/{attempt.total_questions}</span>}
+                                                </div>
+                                                {attempt ? (
+                                                    <div className="quiz-card-actions">
+                                                        <Link to={`/quiz/${quiz.id}`}>
+                                                            <motion.button className="btn-secondary quiz-btn" whileHover={{ scale: 1.02 }}>
+                                                                View Results
+                                                            </motion.button>
+                                                        </Link>
+                                                        <motion.button
+                                                            className="btn-primary quiz-btn reattempt-dashboard-btn"
+                                                            whileHover={{ scale: 1.02 }}
+                                                            onClick={async () => {
+                                                                await supabase.from('quiz_attempts').delete().eq('id', attempt.id);
+                                                                navigate(`/quiz/${quiz.id}?reattempt=true`);
+                                                            }}
+                                                        >
+                                                            <FiRefreshCw /> Re-attempt
+                                                        </motion.button>
+                                                    </div>
+                                                ) : (
+                                                    <Link to={`/quiz/${quiz.id}`}>
+                                                        <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }}>
+                                                            <FiPlay /> {session ? 'Resume Quiz' : 'Start Quiz'}
+                                                        </motion.button>
+                                                    </Link>
+                                                )}
+                                            </motion.div>
+                                        );
+                                    })}
+                                </motion.div>
                             )}
                         </motion.div>
                     )}
