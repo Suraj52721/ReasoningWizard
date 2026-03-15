@@ -16,7 +16,7 @@ const fadeUp = {
     visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.4 } })
 };
 
-const SUBJECTS = ['Mathematics', 'Science', 'English', 'History', 'Geography', 'General Knowledge', 'Reasoning', 'Verbal Reasoning', 'Non-Verbal Reasoning'];
+const SUBJECTS = ['11+ Mathematics', 'Science', 'English', 'History', 'Geography', 'General Knowledge', 'Reasoning', 'Verbal Reasoning', 'Non-Verbal Reasoning'];
 
 function parseBulkQuestions(text) {
     const blocks = text.trim().split(/\n\s*\n/);
@@ -86,7 +86,7 @@ export default function Admin() {
 
     // Quiz form
     const [title, setTitle] = useState('');
-    const [subject, setSubject] = useState('Mathematics');
+    const [subject, setSubject] = useState('11+ Mathematics');
     const [quizDate, setQuizDate] = useState(new Date().toISOString().split('T')[0]);
     const [duration, setDuration] = useState(10);
     const [negativeMarking, setNegativeMarking] = useState(false);

@@ -177,6 +177,27 @@ export default function Dashboard() {
         );
     };
 
+    const groupByDate = (arr) => {
+        const map = {};
+        arr.forEach(q => {
+            const d = q.quiz_date || 'Unknown';
+            if (!map[d]) map[d] = [];
+            map[d].push(q);
+        });
+        return Object.keys(map)
+            .sort((a, b) => b.localeCompare(a))
+            .map(date => ({ date, quizzes: map[date] }));
+    };
+
+    const formatDate = (dateStr) => {
+        const today = new Date().toISOString().split('T')[0];
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        if (dateStr === today) return 'Today';
+        if (dateStr === yesterday) return 'Yesterday';
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+
     const tabs = [
         { id: 'quizzes', label: 'Daily Quizzes', icon: <FiBook /> },
         { id: 'leaderboard', label: 'Leaderboard', icon: <FiTrendingUp /> },
@@ -253,7 +274,7 @@ export default function Dashboard() {
                                     <p>{quizzes.length === 0 ? 'Check back later for new daily quizzes!' : 'Try selecting a different subject.'}</p>
                                 </motion.div>
                             ) : activeSubject === 'All' ? (
-                                /* ── Grouped by subject ── */
+                                /* ── All: Subject → Date → Cards ── */
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key="all-grouped"
@@ -273,25 +294,47 @@ export default function Dashboard() {
                                                     <span className="subject-section-title">{subj}</span>
                                                     <span className="subject-section-count">{subjectQuizzes.length}</span>
                                                 </div>
-                                                <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
-                                                    {subjectQuizzes.map((quiz, i) => renderCard(quiz, i))}
-                                                </motion.div>
+                                                {groupByDate(subjectQuizzes).map(({ date, quizzes: dateQuizzes }) => (
+                                                    <div key={date} className="date-group">
+                                                        <div className="date-group-header">
+                                                            <FiCalendar />
+                                                            <span>{formatDate(date)}</span>
+                                                        </div>
+                                                        <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
+                                                            {dateQuizzes.map((quiz, i) => renderCard(quiz, i))}
+                                                        </motion.div>
+                                                    </div>
+                                                ))}
                                             </motion.div>
                                         ))}
                                     </motion.div>
                                 </AnimatePresence>
                             ) : (
-                                /* ── Single subject flat grid ── */
+                                /* ── Single subject: Date → Cards ── */
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key={activeSubject}
-                                        className="quiz-cards"
-                                        variants={stagger}
-                                        initial="hidden"
-                                        animate="visible"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
                                         exit={{ opacity: 0, transition: { duration: 0.12 } }}
                                     >
-                                        {filteredQuizzes.map((quiz, i) => renderCard(quiz, i))}
+                                        {groupByDate(filteredQuizzes).map(({ date, quizzes: dateQuizzes }, di) => (
+                                            <motion.div
+                                                key={date}
+                                                className="date-group"
+                                                initial={{ opacity: 0, y: 14 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: di * 0.06, duration: 0.3 }}
+                                            >
+                                                <div className="date-group-header">
+                                                    <FiCalendar />
+                                                    <span>{formatDate(date)}</span>
+                                                </div>
+                                                <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
+                                                    {dateQuizzes.map((quiz, i) => renderCard(quiz, i))}
+                                                </motion.div>
+                                            </motion.div>
+                                        ))}
                                     </motion.div>
                                 </AnimatePresence>
                             )}

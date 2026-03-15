@@ -133,6 +133,33 @@
     border-color: rgba(245, 197, 24, 0.4) !important;
 }
 
+/* Date Groups */
+.date-group {
+    margin-bottom: 1.8rem;
+}
+
+.date-group-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0.85rem;
+    padding: 4px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.date-group-header svg {
+    font-size: 0.8rem;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
 /* Subject Sections (All view) */
 .subject-section {
     margin-bottom: 2.5rem;
