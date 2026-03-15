@@ -199,7 +199,7 @@ export default function Dashboard() {
     };
 
     const tabs = [
-        { id: 'quizzes', label: 'Daily Quizzes', icon: <FiBook /> },
+        { id: 'quizzes', label: 'Daily Worksheets', icon: <FiBook /> },
         { id: 'leaderboard', label: 'Leaderboard', icon: <FiTrendingUp /> },
         { id: 'profile', label: 'Profile', icon: <FiUser /> },
     ];
