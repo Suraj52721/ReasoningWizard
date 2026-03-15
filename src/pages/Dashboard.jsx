@@ -162,7 +162,7 @@ export default function Dashboard() {
                 ) : (
                     <Link to={`/quiz/${quiz.id}`}>
                         <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }}>
-                            <FiPlay /> {session ? 'Resume Quiz' : 'Start Quiz'}
+                            <FiPlay /> {session ? 'Resume Quiz' : 'Attempt Online'}
                         </motion.button>
                     </Link>
                 )}
