@@ -414,6 +414,16 @@
     align-self: flex-start;
 }
 
+.worksheet-upload-label {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+}
+
+.worksheet-upload-btn {
+    margin-top: 1rem;
+}
+
 /* Image support */
 .mq-image-row {
     display: flex;

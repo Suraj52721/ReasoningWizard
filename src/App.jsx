@@ -40,7 +40,7 @@ function App() {
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/questions" element={<Questions />} />
               <Route path="/question/:questionId" element={<QuestionDetail />} />
-              <Route path="/dashboard" element={
+<Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>

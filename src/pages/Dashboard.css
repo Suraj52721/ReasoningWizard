@@ -70,6 +70,98 @@
     z-index: -1;
 }
 
+/* Subject Toggle */
+.subject-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.subject-filter-btn {
+    position: relative;
+    padding: 8px 20px;
+    border-radius: 24px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.subject-filter-btn.active {
+    color: var(--primary);
+    border-color: rgba(245, 197, 24, 0.5);
+}
+
+.subject-filter-btn:hover:not(.active) {
+    color: var(--text-primary);
+    border-color: rgba(245, 197, 24, 0.25);
+}
+
+.subject-indicator {
+    position: absolute;
+    inset: 0;
+    background: rgba(245, 197, 24, 0.12);
+    border-radius: 24px;
+    z-index: 0;
+}
+
+.subject-btn-label {
+    position: relative;
+    z-index: 1;
+}
+
+/* Worksheet download button */
+.worksheet-dl-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 0.85rem !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border) !important;
+}
+
+.worksheet-dl-btn:hover {
+    color: var(--primary) !important;
+    border-color: rgba(245, 197, 24, 0.4) !important;
+}
+
+/* Subject Sections (All view) */
+.subject-section {
+    margin-bottom: 2.5rem;
+}
+
+.subject-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.subject-section-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.subject-section-count {
+    background: rgba(245, 197, 24, 0.12);
+    color: var(--primary);
+    padding: 2px 9px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
 /* Quiz Cards */
 .quiz-date-group {
     margin-bottom: 2.5rem;

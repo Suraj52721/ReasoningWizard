@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
-import { FiCalendar, FiClock, FiPlay, FiUser, FiEdit2, FiSave, FiTrendingUp, FiAward, FiCheckCircle, FiBook, FiRefreshCw } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiPlay, FiUser, FiEdit2, FiSave, FiTrendingUp, FiAward, FiCheckCircle, FiBook, FiRefreshCw, FiDownload } from 'react-icons/fi';
 import './Dashboard.css';
 
 const fadeUp = {
@@ -23,6 +23,8 @@ export default function Dashboard() {
     const [attempts, setAttempts] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [leaderboard, setLeaderboard] = useState([]);
+    const [worksheets, setWorksheets] = useState([]);
+    const [activeSubject, setActiveSubject] = useState('All');
     const [loadingQuizzes, setLoadingQuizzes] = useState(true);
     const [editingProfile, setEditingProfile] = useState(false);
     const [profileForm, setProfileForm] = useState({ display_name: '', phone: '' });
@@ -57,9 +59,14 @@ export default function Dashboard() {
             .select('*')
             .eq('user_id', user.id);
 
+        const { data: wsData } = await supabase
+            .from('daily_worksheets')
+            .select('id, title, subject, worksheet_date, file_url, file_name');
+
         setQuizzes(quizzesData || []);
         setAttempts(attemptsData || []);
         setSessions(sessionsData || []);
+        setWorksheets(wsData || []);
         setLoadingQuizzes(false);
     }
 
@@ -99,6 +106,76 @@ export default function Dashboard() {
 
     const getAttempt = (quizId) => attempts.find(a => a.quiz_id === quizId);
     const getSession = (quizId) => sessions.find(s => s.quiz_id === quizId);
+    const getWorksheet = (quiz) => worksheets.find(w => w.subject === quiz.subject && w.worksheet_date === quiz.quiz_date);
+
+    const subjects = useMemo(() => {
+        const s = [...new Set(quizzes.map(q => q.subject).filter(Boolean))].sort();
+        return s.length > 0 ? ['All', ...s] : [];
+    }, [quizzes]);
+
+    const filteredQuizzes = activeSubject === 'All'
+        ? quizzes
+        : quizzes.filter(q => q.subject === activeSubject);
+
+    // Groups for 'All' view: [{subj, quizzes[]}] in sorted order
+    const groupedBySubject = useMemo(() => {
+        const map = {};
+        quizzes.forEach(q => {
+            const s = q.subject || 'General';
+            if (!map[s]) map[s] = [];
+            map[s].push(q);
+        });
+        return subjects.slice(1).map(s => ({ subj: s, quizzes: map[s] || [] })).filter(g => g.quizzes.length > 0);
+    }, [quizzes, subjects]);
+
+    const renderCard = (quiz, i) => {
+        const attempt = getAttempt(quiz.id);
+        const session = getSession(quiz.id);
+        const worksheet = getWorksheet(quiz);
+        return (
+            <motion.div key={quiz.id} className={`quiz-card glass-card ${attempt ? 'completed' : ''}`} variants={fadeUp} custom={i} whileHover={{ y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
+                <div className="quiz-card-header">
+                    <div className="quiz-subject-badge">{quiz.subject}</div>
+                    {attempt && <div className="completed-badge"><FiCheckCircle /> Done</div>}
+                </div>
+                <h4 className="quiz-card-title">{quiz.title}</h4>
+                <div className="quiz-card-meta">
+                    <span><FiClock /> {quiz.duration_minutes} min</span>
+                    {attempt && <span><FiAward /> {attempt.score}/{attempt.total_questions}</span>}
+                </div>
+                {attempt ? (
+                    <div className="quiz-card-actions">
+                        <Link to={`/quiz/${quiz.id}`}>
+                            <motion.button className="btn-secondary quiz-btn" whileHover={{ scale: 1.02 }}>View Results</motion.button>
+                        </Link>
+                        <motion.button
+                            className="btn-primary quiz-btn reattempt-dashboard-btn"
+                            whileHover={{ scale: 1.02 }}
+                            onClick={async () => {
+                                await supabase.from('quiz_attempts').delete().eq('id', attempt.id);
+                                navigate(`/quiz/${quiz.id}?reattempt=true`);
+                            }}
+                        >
+                            <FiRefreshCw /> Re-attempt
+                        </motion.button>
+                    </div>
+                ) : (
+                    <Link to={`/quiz/${quiz.id}`}>
+                        <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }}>
+                            <FiPlay /> {session ? 'Resume Quiz' : 'Start Quiz'}
+                        </motion.button>
+                    </Link>
+                )}
+                {worksheet && (
+                    <a href={worksheet.file_url} download={worksheet.file_name} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: '0.5rem' }}>
+                        <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" whileHover={{ scale: 1.02 }}>
+                            <FiDownload /> Download Worksheet
+                        </motion.button>
+                    </a>
+                )}
+            </motion.div>
+        );
+    };
 
     const tabs = [
         { id: 'quizzes', label: 'Daily Quizzes', icon: <FiBook /> },
@@ -135,62 +212,88 @@ export default function Dashboard() {
                 <AnimatePresence mode="wait">
                     {tab === 'quizzes' && (
                         <motion.div key="quizzes" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
+
+                            {/* Subject Toggle */}
+                            {!loadingQuizzes && subjects.length > 1 && (
+                                <motion.div
+                                    className="subject-filter"
+                                    initial={{ opacity: 0, y: -8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                >
+                                    {subjects.map(subj => (
+                                        <motion.button
+                                            key={subj}
+                                            className={`subject-filter-btn ${activeSubject === subj ? 'active' : ''}`}
+                                            onClick={() => setActiveSubject(subj)}
+                                            whileTap={{ scale: 0.93 }}
+                                        >
+                                            {activeSubject === subj && (
+                                                <motion.div
+                                                    className="subject-indicator"
+                                                    layoutId="subjectIndicator"
+                                                    transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                                                />
+                                            )}
+                                            <span className="subject-btn-label">{subj}</span>
+                                        </motion.button>
+                                    ))}
+                                </motion.div>
+                            )}
+
                             {loadingQuizzes ? (
                                 <div className="loading-state">
                                     <motion.div className="spinner" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
                                     <p>Loading quizzes...</p>
                                 </div>
-                            ) : quizzes.length === 0 ? (
-                                <div className="empty-state glass-card">
+                            ) : filteredQuizzes.length === 0 ? (
+                                <motion.div className="empty-state glass-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                     <FiCalendar />
-                                    <h3>No quizzes available</h3>
-                                    <p>Check back later for new daily quizzes!</p>
-                                </div>
-                            ) : (
-                                <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
-                                    {quizzes.map((quiz, i) => {
-                                        const attempt = getAttempt(quiz.id);
-                                        const session = getSession(quiz.id);
-                                        return (
-                                            <motion.div key={quiz.id} className={`quiz-card glass-card ${attempt ? 'completed' : ''}`} variants={fadeUp} custom={i} whileHover={{ y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
-                                                <div className="quiz-card-header">
-                                                    <div className="quiz-subject-badge">{quiz.subject}</div>
-                                                    {attempt && <div className="completed-badge"><FiCheckCircle /> Done</div>}
-                                                </div>
-                                                <h4 className="quiz-card-title">{quiz.title}</h4>
-                                                <div className="quiz-card-meta">
-                                                    <span><FiClock /> {quiz.duration_minutes} min</span>
-                                                    {attempt && <span><FiAward /> {attempt.score}/{attempt.total_questions}</span>}
-                                                </div>
-                                                {attempt ? (
-                                                    <div className="quiz-card-actions">
-                                                        <Link to={`/quiz/${quiz.id}`}>
-                                                            <motion.button className="btn-secondary quiz-btn" whileHover={{ scale: 1.02 }}>
-                                                                View Results
-                                                            </motion.button>
-                                                        </Link>
-                                                        <motion.button
-                                                            className="btn-primary quiz-btn reattempt-dashboard-btn"
-                                                            whileHover={{ scale: 1.02 }}
-                                                            onClick={async () => {
-                                                                await supabase.from('quiz_attempts').delete().eq('id', attempt.id);
-                                                                navigate(`/quiz/${quiz.id}?reattempt=true`);
-                                                            }}
-                                                        >
-                                                            <FiRefreshCw /> Re-attempt
-                                                        </motion.button>
-                                                    </div>
-                                                ) : (
-                                                    <Link to={`/quiz/${quiz.id}`}>
-                                                        <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }}>
-                                                            <FiPlay /> {session ? 'Resume Quiz' : 'Start Quiz'}
-                                                        </motion.button>
-                                                    </Link>
-                                                )}
-                                            </motion.div>
-                                        );
-                                    })}
+                                    <h3>{quizzes.length === 0 ? 'No quizzes available' : `No ${activeSubject} quizzes`}</h3>
+                                    <p>{quizzes.length === 0 ? 'Check back later for new daily quizzes!' : 'Try selecting a different subject.'}</p>
                                 </motion.div>
+                            ) : activeSubject === 'All' ? (
+                                /* ── Grouped by subject ── */
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key="all-grouped"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                                    >
+                                        {groupedBySubject.map(({ subj, quizzes: subjectQuizzes }, si) => (
+                                            <motion.div
+                                                key={subj}
+                                                className="subject-section"
+                                                initial={{ opacity: 0, y: 16 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: si * 0.07, duration: 0.35 }}
+                                            >
+                                                <div className="subject-section-header">
+                                                    <span className="subject-section-title">{subj}</span>
+                                                    <span className="subject-section-count">{subjectQuizzes.length}</span>
+                                                </div>
+                                                <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
+                                                    {subjectQuizzes.map((quiz, i) => renderCard(quiz, i))}
+                                                </motion.div>
+                                            </motion.div>
+                                        ))}
+                                    </motion.div>
+                                </AnimatePresence>
+                            ) : (
+                                /* ── Single subject flat grid ── */
+                                <AnimatePresence mode="wait">
+                                    <motion.div
+                                        key={activeSubject}
+                                        className="quiz-cards"
+                                        variants={stagger}
+                                        initial="hidden"
+                                        animate="visible"
+                                        exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                                    >
+                                        {filteredQuizzes.map((quiz, i) => renderCard(quiz, i))}
+                                    </motion.div>
+                                </AnimatePresence>
                             )}
                         </motion.div>
                     )}

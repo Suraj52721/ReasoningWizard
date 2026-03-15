@@ -112,8 +112,13 @@ export default function Admin() {
     const [visitorSort, setVisitorSort] = useState({ field: 'visited_at', dir: 'desc' });
     const VISITORS_PER_PAGE = 15;
 
+    // Daily worksheets (for manage tab badges + inline quiz upload)
+    const [worksheets, setWorksheets] = useState([]);
+    const [worksheetPdfFile, setWorksheetPdfFile] = useState(null);
+
     useEffect(() => {
         fetchQuizzes();
+        fetchWorksheets();
     }, []);
 
     useEffect(() => {
@@ -129,6 +134,15 @@ export default function Admin() {
             .limit(50);
         setQuizzes(data || []);
         setLoadingQuizzes(false);
+    }
+
+    async function fetchWorksheets() {
+        const { data } = await supabase
+            .from('daily_worksheets')
+            .select('id, title, subject, worksheet_date')
+            .order('worksheet_date', { ascending: false })
+            .limit(200);
+        setWorksheets(data || []);
     }
 
     async function loadQuizForEditing(quiz) {
@@ -432,6 +446,31 @@ export default function Admin() {
             }
 
             setMessage({ type: 'success', text: `Quiz "${title}" ${isDraft ? 'saved as draft' : (editingQuizId ? 'updated' : 'published')} with ${questions.length} questions!` });
+
+            // Upload worksheet PDF if provided
+            if (worksheetPdfFile && !isDraft) {
+                try {
+                    const safeFileName = worksheetPdfFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                    const filePath = `${Date.now()}-${Math.random().toString(36).slice(2)}-${safeFileName}`;
+                    const { error: uploadError } = await supabase.storage
+                        .from('daily_worksheets')
+                        .upload(filePath, worksheetPdfFile, { contentType: 'application/pdf', upsert: false });
+                    if (!uploadError) {
+                        const { data: publicData } = supabase.storage.from('daily_worksheets').getPublicUrl(filePath);
+                        await supabase.from('daily_worksheets').insert({
+                            title: title.trim(),
+                            subject,
+                            worksheet_date: quizDate,
+                            file_name: worksheetPdfFile.name,
+                            file_path: filePath,
+                            file_url: publicData.publicUrl,
+                            uploaded_by: profile?.id || null,
+                        });
+                        fetchWorksheets();
+                    }
+                } catch (_) { /* worksheet upload failure doesn't block quiz save */ }
+            }
+
             // Reset form
             setEditingQuizId(null);
             setTitle('');
@@ -441,6 +480,7 @@ export default function Admin() {
             setBulkText('');
             setQuestions([]);
             setInputMode('bulk');
+            setWorksheetPdfFile(null);
             fetchQuizzes();
         } catch (err) {
             console.error('Publish error:', err);
@@ -609,6 +649,27 @@ export default function Admin() {
                                     <div className="form-group">
                                         <label><FiClock /> Duration (minutes)</label>
                                         <input className="admin-input" type="number" min={1} max={120} value={duration} onChange={e => setDuration(parseInt(e.target.value) || 10)} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label><FiUpload /> Worksheet PDF <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.8rem' }}>(optional)</span></label>
+                                        <label className="file-upload-label worksheet-upload-label">
+                                            <FiUpload /> {worksheetPdfFile ? worksheetPdfFile.name : 'Select PDF'}
+                                            <input
+                                                type="file"
+                                                accept="application/pdf"
+                                                disabled={isReadOnly}
+                                                onChange={e => {
+                                                    const f = e.target.files?.[0];
+                                                    if (f && f.type === 'application/pdf') setWorksheetPdfFile(f);
+                                                    e.target.value = '';
+                                                }}
+                                            />
+                                        </label>
+                                        {worksheetPdfFile && (
+                                            <button type="button" className="btn-secondary btn-sm" onClick={() => setWorksheetPdfFile(null)} style={{ marginTop: '0.4rem' }}>
+                                                <FiX /> Remove
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -878,6 +939,11 @@ Exp: 5 times 5 equals 25.`}
                                                     <div className="manage-meta">
                                                         <span className="manage-badge">{quiz.subject}</span>
                                                         {quiz.is_draft && <span className="manage-badge" style={{ background: 'rgba(255,165,0,0.1)', color: 'orange', borderColor: 'rgba(255,165,0,0.2)' }}>Draft</span>}
+                                                        {worksheets.some(w => w.subject === quiz.subject && w.worksheet_date === quiz.quiz_date) && (
+                                                            <span className="manage-badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.2)' }}>
+                                                                <FiFileText /> Worksheet
+                                                            </span>
+                                                        )}
                                                         <span><FiCalendar /> {quiz.quiz_date}</span>
                                                         <span><FiClock /> {quiz.duration_minutes} min</span>
                                                         <span><FiFileText /> {quiz.questions?.[0]?.count || 0} questions</span>

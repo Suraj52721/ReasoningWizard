@@ -34,6 +34,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Static pages
 const staticPages = [
     '/',
+    '/daily-worksheets',
     '/about',
     '/contact',
     '/careers',
