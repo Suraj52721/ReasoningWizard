@@ -6,7 +6,8 @@ import {
     FiPlus, FiTrash2, FiSave, FiCalendar, FiClock, FiList,
     FiEdit2, FiCheck, FiAlertTriangle, FiFileText, FiEye, FiX, FiImage, FiUpload,
     FiUsers, FiGlobe, FiMonitor, FiSearch, FiChevronLeft, FiChevronRight,
-    FiFilter, FiBarChart2, FiArrowUp, FiArrowDown, FiLock, FiSmartphone
+    FiFilter, FiBarChart2, FiArrowUp, FiArrowDown, FiLock, FiSmartphone,
+    FiExternalLink
 } from 'react-icons/fi';
 import { compressImage } from '../utils/imageCompressor';
 import './Admin.css';
@@ -115,6 +116,8 @@ export default function Admin() {
     // Daily worksheets (for manage tab badges + inline quiz upload)
     const [worksheets, setWorksheets] = useState([]);
     const [worksheetPdfFile, setWorksheetPdfFile] = useState(null);
+    const [existingWorksheet, setExistingWorksheet] = useState(null); // worksheet already linked to quiz being edited
+    const [worksheetRemoved, setWorksheetRemoved] = useState(false);  // user clicked Remove on existing worksheet
 
     useEffect(() => {
         fetchQuizzes();
@@ -139,7 +142,7 @@ export default function Admin() {
     async function fetchWorksheets() {
         const { data } = await supabase
             .from('daily_worksheets')
-            .select('id, title, subject, worksheet_date')
+            .select('id, quiz_id, title, subject, worksheet_date, file_url, file_name, file_path')
             .order('worksheet_date', { ascending: false })
             .limit(200);
         setWorksheets(data || []);
@@ -161,6 +164,16 @@ export default function Admin() {
         setDuration(quiz.duration_minutes);
         setNegativeMarking(quiz.negative_marking);
         setNegativeMarks(quiz.negative_marks || 0.25);
+
+        // Fetch linked worksheet
+        const { data: wsData } = await supabase
+            .from('daily_worksheets')
+            .select('id, quiz_id, title, file_url, file_name, file_path')
+            .eq('quiz_id', quiz.id)
+            .maybeSingle();
+        setExistingWorksheet(wsData || null);
+        setWorksheetRemoved(false);
+        setWorksheetPdfFile(null);
 
         const loadedQuestions = (qData || []).map(q => {
             let parsedOpts = q.options;
@@ -447,28 +460,41 @@ export default function Admin() {
 
             setMessage({ type: 'success', text: `Quiz "${title}" ${isDraft ? 'saved as draft' : (editingQuizId ? 'updated' : 'published')} with ${questions.length} questions!` });
 
-            // Upload worksheet PDF if provided
-            if (worksheetPdfFile && !isDraft) {
+            // Handle worksheet for this quiz
+            if (!isDraft) {
                 try {
-                    const safeFileName = worksheetPdfFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-                    const filePath = `${Date.now()}-${Math.random().toString(36).slice(2)}-${safeFileName}`;
-                    const { error: uploadError } = await supabase.storage
-                        .from('daily_worksheets')
-                        .upload(filePath, worksheetPdfFile, { contentType: 'application/pdf', upsert: false });
-                    if (!uploadError) {
-                        const { data: publicData } = supabase.storage.from('daily_worksheets').getPublicUrl(filePath);
-                        await supabase.from('daily_worksheets').insert({
-                            title: title.trim(),
-                            subject,
-                            worksheet_date: quizDate,
-                            file_name: worksheetPdfFile.name,
-                            file_path: filePath,
-                            file_url: publicData.publicUrl,
-                            uploaded_by: profile?.id || null,
-                        });
-                        fetchWorksheets();
+                    if (worksheetPdfFile) {
+                        // Delete existing worksheet if any (replace it)
+                        if (existingWorksheet) {
+                            await supabase.storage.from('daily_worksheets').remove([existingWorksheet.file_path]);
+                            await supabase.from('daily_worksheets').delete().eq('id', existingWorksheet.id);
+                        }
+                        // Upload new worksheet linked to this quiz
+                        const safeFileName = worksheetPdfFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                        const filePath = `${Date.now()}-${Math.random().toString(36).slice(2)}-${safeFileName}`;
+                        const { error: uploadError } = await supabase.storage
+                            .from('daily_worksheets')
+                            .upload(filePath, worksheetPdfFile, { contentType: 'application/pdf', upsert: false });
+                        if (!uploadError) {
+                            const { data: publicData } = supabase.storage.from('daily_worksheets').getPublicUrl(filePath);
+                            await supabase.from('daily_worksheets').insert({
+                                title: title.trim(),
+                                subject,
+                                worksheet_date: quizDate,
+                                quiz_id: quizData.id,
+                                file_name: worksheetPdfFile.name,
+                                file_path: filePath,
+                                file_url: publicData.publicUrl,
+                                uploaded_by: profile?.id || null,
+                            });
+                        }
+                    } else if (worksheetRemoved && existingWorksheet) {
+                        // User explicitly removed the worksheet
+                        await supabase.storage.from('daily_worksheets').remove([existingWorksheet.file_path]);
+                        await supabase.from('daily_worksheets').delete().eq('id', existingWorksheet.id);
                     }
-                } catch (_) { /* worksheet upload failure doesn't block quiz save */ }
+                    fetchWorksheets();
+                } catch (_) { /* worksheet errors don't block quiz save */ }
             }
 
             // Reset form
@@ -481,6 +507,8 @@ export default function Admin() {
             setQuestions([]);
             setInputMode('bulk');
             setWorksheetPdfFile(null);
+            setExistingWorksheet(null);
+            setWorksheetRemoved(false);
             fetchQuizzes();
         } catch (err) {
             console.error('Publish error:', err);
@@ -652,23 +680,49 @@ export default function Admin() {
                                     </div>
                                     <div className="form-group">
                                         <label><FiUpload /> Worksheet PDF <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.8rem' }}>(optional)</span></label>
-                                        <label className="file-upload-label worksheet-upload-label">
-                                            <FiUpload /> {worksheetPdfFile ? worksheetPdfFile.name : 'Select PDF'}
-                                            <input
-                                                type="file"
-                                                accept="application/pdf"
-                                                disabled={isReadOnly}
-                                                onChange={e => {
-                                                    const f = e.target.files?.[0];
-                                                    if (f && f.type === 'application/pdf') setWorksheetPdfFile(f);
-                                                    e.target.value = '';
-                                                }}
-                                            />
-                                        </label>
-                                        {worksheetPdfFile && (
-                                            <button type="button" className="btn-secondary btn-sm" onClick={() => setWorksheetPdfFile(null)} style={{ marginTop: '0.4rem' }}>
-                                                <FiX /> Remove
-                                            </button>
+
+                                        {/* Show existing worksheet when editing */}
+                                        {existingWorksheet && !worksheetRemoved && !worksheetPdfFile ? (
+                                            <div className="existing-worksheet-row">
+                                                <FiFileText style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                                <span className="existing-worksheet-name" title={existingWorksheet.file_name}>{existingWorksheet.file_name}</span>
+                                                <a href={existingWorksheet.file_url} target="_blank" rel="noopener noreferrer">
+                                                    <button type="button" className="btn-secondary btn-sm"><FiExternalLink /></button>
+                                                </a>
+                                                {!isReadOnly && (
+                                                    <button type="button" className="btn-delete btn-sm" onClick={() => setWorksheetRemoved(true)} title="Remove worksheet">
+                                                        <FiTrash2 />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <label className="file-upload-label worksheet-upload-label">
+                                                    <FiUpload /> {worksheetPdfFile ? worksheetPdfFile.name : (worksheetRemoved ? 'Upload replacement PDF' : 'Select PDF')}
+                                                    <input
+                                                        type="file"
+                                                        accept="application/pdf"
+                                                        disabled={isReadOnly}
+                                                        onChange={e => {
+                                                            const f = e.target.files?.[0];
+                                                            if (f && f.type === 'application/pdf') setWorksheetPdfFile(f);
+                                                            e.target.value = '';
+                                                        }}
+                                                    />
+                                                </label>
+                                                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                                                    {worksheetPdfFile && (
+                                                        <button type="button" className="btn-secondary btn-sm" onClick={() => setWorksheetPdfFile(null)}>
+                                                            <FiX /> Clear
+                                                        </button>
+                                                    )}
+                                                    {worksheetRemoved && (
+                                                        <button type="button" className="btn-secondary btn-sm" onClick={() => setWorksheetRemoved(false)}>
+                                                            Undo Remove
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -939,7 +993,7 @@ Exp: 5 times 5 equals 25.`}
                                                     <div className="manage-meta">
                                                         <span className="manage-badge">{quiz.subject}</span>
                                                         {quiz.is_draft && <span className="manage-badge" style={{ background: 'rgba(255,165,0,0.1)', color: 'orange', borderColor: 'rgba(255,165,0,0.2)' }}>Draft</span>}
-                                                        {worksheets.some(w => w.subject === quiz.subject && w.worksheet_date === quiz.quiz_date) && (
+                                                        {worksheets.some(w => w.quiz_id === quiz.id) && (
                                                             <span className="manage-badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.2)' }}>
                                                                 <FiFileText /> Worksheet
                                                             </span>

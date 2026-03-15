@@ -13,11 +13,16 @@ CREATE TABLE IF NOT EXISTS public.daily_worksheets (
   file_path TEXT NOT NULL UNIQUE,
   file_url TEXT NOT NULL,
   uploaded_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  quiz_id UUID REFERENCES public.quizzes(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Run this if the table already exists:
+ALTER TABLE public.daily_worksheets ADD COLUMN IF NOT EXISTS quiz_id UUID REFERENCES public.quizzes(id) ON DELETE CASCADE;
+
 CREATE INDEX IF NOT EXISTS idx_daily_worksheets_date ON public.daily_worksheets (worksheet_date DESC);
 CREATE INDEX IF NOT EXISTS idx_daily_worksheets_created_at ON public.daily_worksheets (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_worksheets_quiz_id ON public.daily_worksheets (quiz_id);
 
 ALTER TABLE public.daily_worksheets ENABLE ROW LEVEL SECURITY;
 

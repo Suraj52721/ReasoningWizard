@@ -61,7 +61,7 @@ export default function Dashboard() {
 
         const { data: wsData } = await supabase
             .from('daily_worksheets')
-            .select('id, title, subject, worksheet_date, file_url, file_name');
+            .select('id, quiz_id, file_url, file_name');
 
         setQuizzes(quizzesData || []);
         setAttempts(attemptsData || []);
@@ -106,7 +106,7 @@ export default function Dashboard() {
 
     const getAttempt = (quizId) => attempts.find(a => a.quiz_id === quizId);
     const getSession = (quizId) => sessions.find(s => s.quiz_id === quizId);
-    const getWorksheet = (quiz) => worksheets.find(w => w.subject === quiz.subject && w.worksheet_date === quiz.quiz_date);
+    const getWorksheet = (quiz) => worksheets.find(w => w.quiz_id === quiz.id);
 
     const subjects = useMemo(() => {
         const s = [...new Set(quizzes.map(q => q.subject).filter(Boolean))].sort();
