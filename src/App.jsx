@@ -30,7 +30,8 @@ function App() {
           <SEO />
           <Layout>
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/home" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/about" element={<About />} />
@@ -40,11 +41,7 @@ function App() {
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/questions" element={<Questions />} />
               <Route path="/question/:questionId" element={<QuestionDetail />} />
-<Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
+<Route path="/dashboard" element={<Dashboard />} />
               <Route path="/quiz/:id" element={
                 <ProtectedRoute>
                   <Quiz />
@@ -60,7 +57,7 @@ function App() {
                   <Admin />
                 </AdminRoute>
               } />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Layout>
         </AuthProvider>

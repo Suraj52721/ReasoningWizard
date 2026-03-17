@@ -3,8 +3,62 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
-import { FiCalendar, FiClock, FiPlay, FiUser, FiEdit2, FiSave, FiTrendingUp, FiAward, FiCheckCircle, FiBook, FiRefreshCw, FiDownload } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiPlay, FiUser, FiEdit2, FiSave, FiTrendingUp, FiAward, FiCheckCircle, FiBook, FiRefreshCw, FiDownload, FiX, FiLogIn, FiArrowRight } from 'react-icons/fi';
+import logo from '../assets/logo.png';
 import './Dashboard.css';
+import './Home.css';
+
+function LoginPopup({ onClose }) {
+    return (
+        <motion.div
+            className="login-popup-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={onClose}
+        >
+            <motion.div
+                className="login-popup glass-card"
+                initial={{ opacity: 0, scale: 0.85, y: 30 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: 30 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                onClick={e => e.stopPropagation()}
+            >
+                <button className="popup-close" onClick={onClose}>
+                    <FiX />
+                </button>
+                <div className="popup-icon-wrap">
+                    <motion.img
+                        src={logo}
+                        alt="ReasoningWizard"
+                        className="popup-logo-img"
+                        animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.05, 1] }}
+                        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                </div>
+                <h2 className="popup-title">Welcome to ReasoningWizard!</h2>
+                <p className="popup-desc">
+                    Sign in to access daily quizzes, track your progress on leaderboards, and start mastering your exams.
+                </p>
+                <div className="popup-actions">
+                    <Link to="/login" onClick={onClose}>
+                        <motion.button className="btn-primary popup-btn" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                            <FiLogIn /> Sign In
+                        </motion.button>
+                    </Link>
+                    <Link to="/register" onClick={onClose}>
+                        <motion.button className="btn-secondary popup-btn" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                            Create Account <FiArrowRight />
+                        </motion.button>
+                    </Link>
+                </div>
+                <p className="popup-footer">Free forever · No credit card required</p>
+            </motion.div>
+        </motion.div>
+    );
+}
 
 const fadeUp = {
     hidden: { opacity: 0, y: 30 },
@@ -29,6 +83,7 @@ export default function Dashboard() {
     const [editingProfile, setEditingProfile] = useState(false);
     const [profileForm, setProfileForm] = useState({ display_name: '', phone: '' });
     const [savingProfile, setSavingProfile] = useState(false);
+    const [showLoginPopup, setShowLoginPopup] = useState(false);
 
     useEffect(() => {
         fetchQuizzes();
@@ -49,23 +104,27 @@ export default function Dashboard() {
             .neq('is_draft', true)
             .order('quiz_date', { ascending: false });
 
-        const { data: attemptsData } = await supabase
-            .from('quiz_attempts')
-            .select('*')
-            .eq('user_id', user.id);
-
-        const { data: sessionsData } = await supabase
-            .from('quiz_sessions')
-            .select('*')
-            .eq('user_id', user.id);
+        let attemptsData = [], sessionsData = [];
+        if (user) {
+            const { data: aData } = await supabase
+                .from('quiz_attempts')
+                .select('*')
+                .eq('user_id', user.id);
+            const { data: sData } = await supabase
+                .from('quiz_sessions')
+                .select('*')
+                .eq('user_id', user.id);
+            attemptsData = aData || [];
+            sessionsData = sData || [];
+        }
 
         const { data: wsData } = await supabase
             .from('daily_worksheets')
             .select('id, quiz_id, file_url, file_name');
 
         setQuizzes(quizzesData || []);
-        setAttempts(attemptsData || []);
-        setSessions(sessionsData || []);
+        setAttempts(attemptsData);
+        setSessions(sessionsData);
         setWorksheets(wsData || []);
         setLoadingQuizzes(false);
     }
@@ -159,19 +218,29 @@ export default function Dashboard() {
                             <FiRefreshCw /> Re-attempt
                         </motion.button>
                     </div>
-                ) : (
+                ) : user ? (
                     <Link to={`/quiz/${quiz.id}`}>
                         <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }}>
                             <FiPlay /> {session ? 'Resume Quiz' : 'Attempt Online'}
                         </motion.button>
                     </Link>
+                ) : (
+                    <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }} onClick={() => setShowLoginPopup(true)}>
+                        <FiPlay /> Attempt Online
+                    </motion.button>
                 )}
                 {worksheet && (
-                    <a href={worksheet.file_url} download={worksheet.file_name} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: '0.5rem' }}>
-                        <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" whileHover={{ scale: 1.02 }}>
+                    user ? (
+                        <a href={worksheet.file_url} download={worksheet.file_name} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: '0.5rem' }}>
+                            <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" whileHover={{ scale: 1.02 }}>
+                                <FiDownload /> Download Worksheet
+                            </motion.button>
+                        </a>
+                    ) : (
+                        <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" style={{ marginTop: '0.5rem', width: '100%' }} whileHover={{ scale: 1.02 }} onClick={() => setShowLoginPopup(true)}>
                             <FiDownload /> Download Worksheet
                         </motion.button>
-                    </a>
+                    )
                 )}
             </motion.div>
         );
@@ -210,8 +279,14 @@ export default function Dashboard() {
                 {/* Header */}
                 <motion.div className="dash-header" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
                     <div>
-                        <h1 className="dash-title">Welcome back, <span className="text-gradient">{profile?.display_name || 'Student'}</span> 👋</h1>
-                        <p className="dash-subtitle">Ready to challenge yourself today?</p>
+                        <h1 className="dash-title">
+                            {user
+                                ? <>Welcome back, <span className="text-gradient">{profile?.display_name || 'Student'}</span> 👋</>
+                                : <>Welcome to <span className="text-gradient">ReasoningWizard</span> ✦</>}
+                        </h1>
+                        <p className="dash-subtitle">
+                            {user ? 'Ready to challenge yourself today?' : 'Sign in to track your progress and compete on leaderboards!'}
+                        </p>
                     </div>
                 </motion.div>
 
@@ -356,7 +431,7 @@ export default function Dashboard() {
                                         {leaderboard.map((entry, i) => (
                                             <motion.div
                                                 key={i}
-                                                className={`leaderboard-row ${entry.user_id === user.id ? 'is-me' : ''}`}
+                                                className={`leaderboard-row ${entry.user_id === user?.id ? 'is-me' : ''}`}
                                                 initial={{ opacity: 0, x: -20 }}
                                                 animate={{ opacity: 1, x: 0 }}
                                                 transition={{ delay: i * 0.08 }}
@@ -382,6 +457,17 @@ export default function Dashboard() {
 
                     {tab === 'profile' && (
                         <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
+                            {!user ? (
+                                <div className="glass-card" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+                                    <FiUser style={{ fontSize: '2.5rem', opacity: 0.5, marginBottom: '1rem' }} />
+                                    <h3 style={{ marginBottom: '0.5rem' }}>Sign in to view your profile</h3>
+                                    <p style={{ opacity: 0.6, marginBottom: '1.5rem' }}>Track your quiz history, scores and personal stats.</p>
+                                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                        <Link to="/login"><motion.button className="btn-primary" whileHover={{ scale: 1.03 }}><FiLogIn /> Sign In</motion.button></Link>
+                                        <Link to="/register"><motion.button className="btn-secondary" whileHover={{ scale: 1.03 }}>Create Account <FiArrowRight /></motion.button></Link>
+                                    </div>
+                                </div>
+                            ) : (
                             <div className="profile-card glass-card">
                                 <div className="profile-header-section">
                                     <div className="profile-big-avatar">
@@ -445,10 +531,15 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             </div>
+                            )}
                         </motion.div>
                     )}
                 </AnimatePresence>
             </div>
+
+            <AnimatePresence>
+                {showLoginPopup && <LoginPopup onClose={() => setShowLoginPopup(false)} />}
+            </AnimatePresence>
         </div>
     );
 }
