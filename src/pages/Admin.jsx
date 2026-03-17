@@ -461,8 +461,7 @@ export default function Admin() {
             setMessage({ type: 'success', text: `Quiz "${title}" ${isDraft ? 'saved as draft' : (editingQuizId ? 'updated' : 'published')} with ${questions.length} questions!` });
 
             // Handle worksheet for this quiz
-            if (!isDraft) {
-                try {
+            try {
                     if (worksheetPdfFile) {
                         // Delete existing worksheet if any (replace it)
                         if (existingWorksheet) {
@@ -495,7 +494,6 @@ export default function Admin() {
                     }
                     fetchWorksheets();
                 } catch (_) { /* worksheet errors don't block quiz save */ }
-            }
 
             // Reset form
             setEditingQuizId(null);

@@ -40,7 +40,7 @@ function LoginPopup({ onClose }) {
                 </div>
                 <h2 className="popup-title">Welcome to ReasoningWizard!</h2>
                 <p className="popup-desc">
-                    Sign in to access daily quizzes, track your progress on leaderboards, and start mastering your exams.
+                   Sign in to access daily worksheets, weekly tests, mocks, and many more resources, track your progress on leaderboards, and start mastering your exams.
                 </p>
                 <div className="popup-actions">
                     <Link to="/login" onClick={onClose}>

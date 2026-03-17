@@ -35,7 +35,7 @@ export default function Navbar() {
     };
 
     const navLinks = [
-        { to: '/', label: 'Home' },
+        { to: '/home', label: 'Home' },
         { to: '/about', label: 'About' },
         { to: '/contact', label: 'Contact' },
         ...(user ? [{ to: '/dashboard', label: 'Dashboard' }] : []),
@@ -50,7 +50,7 @@ export default function Navbar() {
             transition={{ type: 'spring', stiffness: 100, damping: 20 }}
         >
             <div className="navbar-inner">
-                <Link to="/" className="navbar-logo">
+                <Link to="/dashboard" className="navbar-logo">
                     <motion.img
                         src={logo}
                         alt="ReasoningWizard"
