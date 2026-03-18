@@ -1,16 +1,76 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-export default function SEO({ title, description, keywords, image, schema }) {
+const routeSeo = {
+    '/dashboard': {
+        title: 'Student Dashboard',
+        description: 'Access your quizzes, worksheets, attempts, rankings, and learning progress in the ReasoningWizard dashboard.'
+    },
+    '/home': {
+        title: '11+ Practice Quizzes and Learning Resources',
+        description: "ReasoningWizard helps UK students prepare for 11+, SATs, and GCSE with daily quizzes, solved questions, and progress tracking.",
+        keywords: '11+ practice, SATs preparation, GCSE quizzes, UK tutoring, reasoning questions'
+    },
+    '/about': {
+        title: 'About ReasoningWizard',
+        description: 'Learn about ReasoningWizard, our mission, and how we support UK students with high-quality exam preparation resources.'
+    },
+    '/contact': {
+        title: 'Contact ReasoningWizard',
+        description: 'Get in touch with ReasoningWizard for support, enquiries, and partnership opportunities.'
+    },
+    '/careers': {
+        title: 'Careers at ReasoningWizard',
+        description: 'Explore open roles and career opportunities at ReasoningWizard.'
+    },
+    '/questions': {
+        title: 'Practice Questions with Solutions',
+        description: 'Browse reasoning questions and step-by-step solutions to strengthen exam performance.'
+    },
+    '/privacy-policy': {
+        title: 'Privacy Policy',
+        description: 'Read the Privacy Policy for ReasoningWizard.'
+    },
+    '/terms-of-service': {
+        title: 'Terms of Service',
+        description: 'Read the Terms of Service for ReasoningWizard.'
+    },
+    '/login': {
+        title: 'Sign In',
+        description: 'Sign in to your ReasoningWizard account to continue your learning journey.'
+    },
+    '/register': {
+        title: 'Create Your Account',
+        description: 'Create a free ReasoningWizard account and access quizzes, solutions, and progress tracking.'
+    }
+};
+
+const noIndexPrefixes = ['/admin', '/quiz'];
+
+function normalizePath(pathname) {
+    if (!pathname) return '/';
+    const normalized = pathname.replace(/\/+$/, '');
+    return normalized === '' ? '/' : normalized;
+}
+
+export default function SEO({ title, description, keywords, image, schema, noIndex }) {
     const location = useLocation();
     const siteTitle = "ReasoningWizard";
-    const fullTitle = title ? `${title} | ${siteTitle}` : siteTitle;
+    const normalizedPath = normalizePath(location.pathname);
+    const routeDefaults = routeSeo[normalizedPath] || {};
+    const rawTitle = title || routeDefaults.title;
+    const fullTitle = rawTitle
+        ? (rawTitle.toLowerCase().includes(siteTitle.toLowerCase()) ? rawTitle : `${rawTitle} | ${siteTitle}`)
+        : siteTitle;
     const defaultDesc = "UK's premier tutoring & practice sheets academy for 11+, SATs, and GCSEs. Daily quizzes, expert resources, and live leaderboards.";
-    const metaDesc = description || defaultDesc;
-    const metaKeywords = keywords || "ReasoningWizard, 11+, SATs, GCSE, UK education, quizzes, tutoring, practice sheets";
+    const metaDesc = description || routeDefaults.description || defaultDesc;
+    const metaKeywords = keywords || routeDefaults.keywords || "ReasoningWizard, 11+, SATs, GCSE, UK education, quizzes, tutoring, practice sheets";
     const siteUrl = "https://reasoningwizard.com";
     const metaImage = image ? `${siteUrl}${image}` : `${siteUrl}/logo.png`;
-    const url = `${siteUrl}${location.pathname}`;
+    const url = `${siteUrl}${normalizedPath}`;
+    const shouldNoIndex = typeof noIndex === 'boolean'
+        ? noIndex
+        : noIndexPrefixes.some(prefix => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`));
 
     useEffect(() => {
         // Title
@@ -41,21 +101,30 @@ export default function SEO({ title, description, keywords, image, schema }) {
         // Standard meta
         setMeta('name', 'description', metaDesc);
         setMeta('name', 'keywords', metaKeywords);
+        setMeta('name', 'robots', shouldNoIndex
+            ? 'noindex, nofollow, noarchive'
+            : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
+        setMeta('name', 'googlebot', shouldNoIndex
+            ? 'noindex, nofollow, noarchive'
+            : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
         setLink('canonical', url);
 
         // Open Graph
         setMeta('property', 'og:type', 'website');
         setMeta('property', 'og:url', url);
+        setMeta('property', 'og:site_name', siteTitle);
+        setMeta('property', 'og:locale', 'en_GB');
         setMeta('property', 'og:title', fullTitle);
         setMeta('property', 'og:description', metaDesc);
         setMeta('property', 'og:image', metaImage);
+        setMeta('property', 'og:image:alt', fullTitle);
 
         // Twitter
-        setMeta('property', 'twitter:card', 'summary_large_image');
-        setMeta('property', 'twitter:url', url);
-        setMeta('property', 'twitter:title', fullTitle);
-        setMeta('property', 'twitter:description', metaDesc);
-        setMeta('property', 'twitter:image', metaImage);
+        setMeta('name', 'twitter:card', 'summary_large_image');
+        setMeta('name', 'twitter:url', url);
+        setMeta('name', 'twitter:title', fullTitle);
+        setMeta('name', 'twitter:description', metaDesc);
+        setMeta('name', 'twitter:image', metaImage);
 
         // JSON-LD Structured Data
         const existingScript = document.querySelector('script[data-seo-jsonld]');
@@ -72,7 +141,7 @@ export default function SEO({ title, description, keywords, image, schema }) {
         } else if (existingScript) {
             existingScript.remove();
         }
-    }, [fullTitle, metaDesc, metaKeywords, url, metaImage, schema]);
+    }, [fullTitle, metaDesc, metaKeywords, url, metaImage, schema, shouldNoIndex, siteTitle]);
 
     return null; // This component only manages <head>, renders nothing
 }

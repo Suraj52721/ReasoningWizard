@@ -31,18 +31,18 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Static pages
+// Public indexable pages
 const staticPages = [
-    '/',
-    '/daily-worksheets',
-    '/about',
-    '/contact',
-    '/careers',
-    '/privacy-policy',
-    '/terms-of-service',
-    '/questions',
-    '/login',
-    '/register',
+    { path: '/dashboard', changefreq: 'daily', priority: '0.95' },
+    { path: '/home', changefreq: 'daily', priority: '1.0' },
+    { path: '/questions', changefreq: 'daily', priority: '0.9' },
+    { path: '/about', changefreq: 'monthly', priority: '0.8' },
+    { path: '/contact', changefreq: 'monthly', priority: '0.7' },
+    { path: '/careers', changefreq: 'weekly', priority: '0.7' },
+    { path: '/privacy-policy', changefreq: 'yearly', priority: '0.4' },
+    { path: '/terms-of-service', changefreq: 'yearly', priority: '0.4' },
+    { path: '/login', changefreq: 'monthly', priority: '0.5' },
+    { path: '/register', changefreq: 'monthly', priority: '0.6' }
 ];
 
 async function generate() {
@@ -66,24 +66,25 @@ async function generate() {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 `;
 
-    // Static pages
-    for (const page of staticPages) {
+        // Static pages
+        for (const page of staticPages) {
         xml += `  <url>
-    <loc>${SITE_URL}${page}</loc>
+        <loc>${SITE_URL}${page.path}</loc>
     <lastmod>${today}</lastmod>
-    <changefreq>${page === '/' ? 'daily' : 'weekly'}</changefreq>
-    <priority>${page === '/' ? '1.0' : '0.8'}</priority>
+        <changefreq>${page.changefreq}</changefreq>
+        <priority>${page.priority}</priority>
   </url>
 `;
     }
 
     // Dynamic question pages
-    for (const q of (questions || [])) {
+        const uniqueQuestionIds = [...new Set((questions || []).map(q => q.id))];
+        for (const questionId of uniqueQuestionIds) {
         xml += `  <url>
-    <loc>${SITE_URL}/question/${q.id}</loc>
+        <loc>${SITE_URL}/question/${questionId}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+        <priority>0.8</priority>
   </url>
 `;
     }
@@ -93,7 +94,7 @@ async function generate() {
     const outPath = resolve(__dirname, '..', 'public', 'sitemap.xml');
     writeFileSync(outPath, xml, 'utf-8');
     console.log(`✅ Sitemap written to ${outPath}`);
-    console.log(`   ${staticPages.length} static pages + ${(questions || []).length} question pages`);
+    console.log(`   ${staticPages.length} static pages + ${uniqueQuestionIds.length} question pages`);
 }
 
 generate();

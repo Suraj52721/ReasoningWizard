@@ -375,7 +375,7 @@ export default function Quiz() {
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')} `;
     };
 
-    const percentage = result ? Math.round((result.score / result.total) * 100) : 0;
+    const percentage = result && result.total > 0 ? Math.round((result.score / result.total) * 100) : 0;
 
     if (phase === 'loading') {
         return (
@@ -450,8 +450,12 @@ export default function Quiz() {
     const correctCount = result ? result.answers.filter(a => a?.correct).length : 0;
     const wrongCount = result ? result.answers.filter(a => a && !a.correct && a.selected !== -1).length : 0;
     const unattemptedCount = result ? result.answers.filter(a => a.selected === -1).length : 0;
-    const accuracy = result && (correctCount + wrongCount) > 0 ? Math.round((correctCount / (correctCount + wrongCount)) * 100) : 0;
-    const percentile = myRank && totalParticipants > 1 ? Math.round(((totalParticipants - myRank) / (totalParticipants - 1)) * 100) : 100;
+    const attemptedCount = correctCount + wrongCount;
+    const accuracy = attemptedCount > 0 ? Math.round((correctCount / attemptedCount) * 100) : 0;
+    // Percentile is computed without +1 offset: ((N - rank) / N) * 100
+    const percentile = myRank && totalParticipants > 0
+        ? Math.max(0, Math.min(100, Math.round(((totalParticipants - myRank) / totalParticipants) * 100)))
+        : null;
     const totalTimeSecs = quiz?.duration_minutes * 60 || 600;
     const timeUsedPct = result ? Math.min(100, Math.round((result.timeTaken / totalTimeSecs) * 100)) : 0;
 
@@ -469,9 +473,13 @@ export default function Quiz() {
     };
 
     // Mini circle component for performance summary
-    const MiniCircle = ({ value, max, label, icon, color, suffix = '' }) => {
-        const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+    const MiniCircle = ({ value, max, label, icon, color, suffix = '', displayValue, showMax = true }) => {
+        const numericValue = typeof value === 'number' ? value : Number(value);
+        const numericMax = typeof max === 'number' ? max : Number(max);
+        const hasProgress = Number.isFinite(numericValue) && Number.isFinite(numericMax) && numericMax > 0;
+        const pct = hasProgress ? Math.min(100, (numericValue / numericMax) * 100) : 0;
         const circumference = 2 * Math.PI * 36;
+        const visibleValue = displayValue ?? `${value}${suffix}`;
         return (
             <motion.div className="perf-circle-item" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
                 <div className="perf-circle-ring">
@@ -491,8 +499,8 @@ export default function Quiz() {
                         />
                     </svg>
                     <div className="perf-circle-value">
-                        <span className="perf-val">{value}{suffix}</span>
-                        {max > 0 && <span className="perf-max">/{max}</span>}
+                        <span className="perf-val">{visibleValue}</span>
+                        {showMax && Number.isFinite(numericMax) && numericMax > 0 && <span className="perf-max">/{numericMax}</span>}
                     </div>
                 </div>
                 <div className="perf-circle-label">{icon} {label}</div>
@@ -541,9 +549,25 @@ export default function Quiz() {
                         <h3 className="section-title">Overall Performance Summary</h3>
                         <div className="perf-circles-grid">
                             <MiniCircle value={result.score} max={result.total} label="Your Score" icon={<FiTarget />} color="#33d00fff" />
-                            <MiniCircle value={`${Math.floor(result.timeTaken / 60)}:${(result.timeTaken % 60).toString().padStart(2, '0')} `} max="" label="Time Spent" icon={<FiClock />} color="#3B82F6" suffix="" />
-                            <MiniCircle value={myRank || '-'} max={leaderboard.length || '-'} label="Your Rank" icon={<FiAward />} color="#F59E0B" />
-                            <MiniCircle value={percentile} max={100} label="Percentile" icon={<FiBarChart2 />} color="#10B981" suffix="%" />
+                            <MiniCircle
+                                value={timeUsedPct}
+                                max={100}
+                                label="Time Spent"
+                                icon={<FiClock />}
+                                color="#3B82F6"
+                                displayValue={`${Math.floor(result.timeTaken / 60)}:${(result.timeTaken % 60).toString().padStart(2, '0')}`}
+                                showMax={false}
+                            />
+                            <MiniCircle value={myRank || '-'} max={totalParticipants || '-'} label="Your Rank" icon={<FiAward />} color="#F59E0B" />
+                            <MiniCircle
+                                value={percentile ?? '-'}
+                                max={100}
+                                label="Percentile"
+                                icon={<FiBarChart2 />}
+                                color="#10B981"
+                                displayValue={percentile != null ? `${percentile}%` : '-'}
+                                showMax={false}
+                            />
                             <MiniCircle value={accuracy} max={100} label="Accuracy" icon={<FiPercent />} color="#8B5CF6" suffix="%" />
                         </div>
 
