@@ -99,8 +99,18 @@ export default function About() {
                         ))}
                     </div>
                     <motion.p className="section-subtitle" variants={fadeUp} style={{ marginTop: '3rem' }}>
-                        At Reasoning Wizard, we are committed to helping students become confident learners and strong problem solvers.
+                        At   Reasoning Wizard, we are committed to helping students become confident learners and strong problem solvers.
                     </motion.p>
+                </motion.section>
+
+                {/* Founder Info */}
+                <motion.section className="about-story glass-card" style={{ marginTop: '2rem' }} variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+                    <p style={{ margin: 0, fontSize: '1.15rem', fontStyle: 'italic', fontWeight: 500, lineHeight: 1.8 }}>
+                        "At <span className="text-gradient" style={{ fontStyle: 'normal', fontWeight: 'bold' }}>Reasoning Wizard</span>, we are driven by a singular vision: to make high-quality, effective learning accessible and affordable for every student."
+                    </p>
+                    <p style={{ margin: '1rem 0 0 0', fontSize: '1.1rem', color: 'var(--primary)' }}>
+                        — <strong>Ankur Yadav</strong>, Founder
+                    </p>
                 </motion.section>
             </div>
         </div>
