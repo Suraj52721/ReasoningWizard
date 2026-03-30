@@ -233,3 +233,18 @@
         padding: 0.8rem 1rem;
     }
 }
+
+@media (max-width: 480px) {
+    .navbar-logo {
+        font-size: 1.15rem;
+        gap: 7px;
+    }
+
+    .logo-img {
+        height: 32px;
+    }
+
+    .navbar {
+        padding: 0.7rem 0.75rem;
+    }
+}

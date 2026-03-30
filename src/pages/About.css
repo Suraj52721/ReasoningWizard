@@ -286,3 +286,31 @@
         padding: 2rem 1rem;
     }
 }
+
+@media (max-width: 480px) {
+    .about-title {
+        font-size: 1.7rem;
+    }
+
+    .about-subtitle {
+        font-size: 1rem;
+    }
+
+    .about-inner {
+        padding: 0 1rem;
+    }
+
+    .about-story {
+        padding: 1.5rem 1rem;
+    }
+
+    .about-stat-value {
+        font-size: 1.5rem;
+    }
+
+    .why-choose-us .value-card {
+        flex-direction: column;
+        text-align: center;
+        padding: 1.5rem 1rem;
+    }
+}

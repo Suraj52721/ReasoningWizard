@@ -156,22 +156,32 @@ export default function Admin() {
     }
 
     async function fetchWorksheets() {
-        const [{ data }, { data: logs }] = await Promise.all([
-            supabase.from('daily_worksheets').select('id, quiz_id, title, subject, worksheet_date, file_url, file_name, file_path').order('worksheet_date', { ascending: false }).limit(200),
+        const [{ data }, { data: logs, error: logsError }] = await Promise.all([
+            supabase.from('daily_worksheets').select('id, quiz_id, title, subject, worksheet_date, file_url, file_name, file_path, download_count').order('worksheet_date', { ascending: false }).limit(200),
             supabase.from('download_logs').select('resource_id').eq('resource_type', 'worksheet'),
         ]);
         const countMap = (logs || []).reduce((acc, d) => { acc[d.resource_id] = (acc[d.resource_id] || 0) + 1; return acc; }, {});
-        setWorksheets((data || []).map(w => ({ ...w, download_count: countMap[w.id] || 0 })));
+        setWorksheets((data || []).map(w => ({
+            ...w,
+            download_count: logsError
+                ? (w.download_count || 0)
+                : ((countMap[w.id] || 0) + (w.download_count || 0)),
+        })));
     }
 
     async function fetchPastPapers() {
         setLoadingPastPapers(true);
-        const [{ data: papers }, { data: logs }] = await Promise.all([
+        const [{ data: papers }, { data: logs, error: logsError }] = await Promise.all([
             supabase.from('past_papers').select('*').order('year', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }),
             supabase.from('download_logs').select('resource_id').eq('resource_type', 'past_paper'),
         ]);
         const countMap = (logs || []).reduce((acc, d) => { acc[d.resource_id] = (acc[d.resource_id] || 0) + 1; return acc; }, {});
-        setPastPapers((papers || []).map(p => ({ ...p, download_count: countMap[p.id] || 0 })));
+        setPastPapers((papers || []).map(p => ({
+            ...p,
+            download_count: logsError
+                ? (p.download_count || 0)
+                : ((countMap[p.id] || 0) + (p.download_count || 0)),
+        })));
         setLoadingPastPapers(false);
     }
 

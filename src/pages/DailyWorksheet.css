@@ -88,3 +88,22 @@
         font-size: 1.75rem;
     }
 }
+
+@media (max-width: 480px) {
+    .worksheet-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .worksheet-actions {
+        flex-direction: column;
+    }
+
+    .worksheet-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .worksheet-title {
+        font-size: 1.5rem;
+    }
+}

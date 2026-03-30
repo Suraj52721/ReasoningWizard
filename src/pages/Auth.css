@@ -241,3 +241,17 @@
         font-size: 1.5rem;
     }
 }
+
+@media (max-width: 480px) {
+    .auth-page {
+        padding: 90px 1rem 2rem;
+    }
+
+    .auth-card {
+        padding: 1.5rem 1rem;
+    }
+
+    .auth-title {
+        font-size: 1.35rem;
+    }
+}

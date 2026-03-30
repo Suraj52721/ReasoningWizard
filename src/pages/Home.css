@@ -402,6 +402,50 @@
     }
 }
 
+@media (max-width: 480px) {
+    .hero-section {
+        padding: 90px 1rem 50px;
+    }
+
+    .hero-title {
+        font-size: 2rem;
+    }
+
+    .hero-subtitle {
+        font-size: 0.95rem;
+    }
+
+    .hero-stats {
+        gap: 1rem;
+    }
+
+    .stat-value {
+        font-size: 1.3rem;
+    }
+
+    .features-section,
+    .steps-section,
+    .testimonials-section {
+        padding: 3rem 1rem;
+    }
+
+    .section-title {
+        font-size: 1.6rem;
+    }
+
+    .cta-card {
+        padding: 2rem 1rem;
+    }
+
+    .cta-card h2 {
+        font-size: 1.4rem;
+    }
+
+    .cta-card p {
+        font-size: 0.95rem;
+    }
+}
+
 /* ===== LOGIN POPUP ===== */
 .login-popup-overlay {
     position: fixed;

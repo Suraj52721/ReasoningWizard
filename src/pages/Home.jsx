@@ -191,8 +191,8 @@ export default function Home() {
     ];
 
     const testimonials = [
-        { name: 'Emily R.', role: 'Year 10 Student', text: 'ReasoningWizard has completely transformed how I prepare for exams. The daily quizzes keep me consistent!', stars: 5 },
-        { name: 'James T.', role: 'Year 8 Student', text: 'I love competing on the leaderboard. It motivates me to do better every single day.', stars: 5 },
+        { name: 'Emily R.', role: 'Year 5 Student', text: 'ReasoningWizard has completely transformed how I prepare for exams. The daily quizzes keep me consistent!', stars: 5 },
+        { name: 'James T.', role: 'Year 6 Student', text: 'I love competing on the leaderboard. It motivates me to do better every single day.', stars: 5 },
         { name: 'Sarah K.', role: 'Parent', text: 'Finally a platform that makes learning fun for my children. The practice sheets are excellent quality.', stars: 5 },
     ];
 

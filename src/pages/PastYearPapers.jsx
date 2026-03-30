@@ -95,8 +95,8 @@ export default function PastYearPapers() {
     return (
         <>
             <SEO
-                title="Past Year Papers | ReasoningWizard"
-                description="Download past year papers for 11+ exam preparation. Browse Easy, Medium, and Hard difficulty papers by subject."
+                title="11+ MathsPast Papers | ReasoningWizard"
+                description="Download free 11+ Maths past year papers for 11+ exam preparation. Browse Easy, Medium, and Hard difficulty papers by subject."
             />
             <div className="pyp-page page-container">
                 {/* Hero */}

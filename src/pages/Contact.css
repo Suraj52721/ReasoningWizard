@@ -254,3 +254,21 @@
         padding: 2rem 1.5rem;
     }
 }
+
+@media (max-width: 480px) {
+    .contact-title {
+        font-size: 1.7rem;
+    }
+
+    .contact-subtitle {
+        font-size: 1rem;
+    }
+
+    .contact-form-card {
+        padding: 1.5rem 1rem;
+    }
+
+    .contact-inner {
+        padding: 0 1rem;
+    }
+}

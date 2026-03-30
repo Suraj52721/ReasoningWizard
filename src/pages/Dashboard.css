@@ -524,4 +524,29 @@
     .quiz-card-actions {
         flex-direction: column;
     }
+
+    .dashboard-inner {
+        padding: 0 0.75rem;
+    }
+
+    .dash-title {
+        font-size: 1.4rem;
+    }
+
+    .quiz-card {
+        padding: 1.2rem;
+    }
+
+    .quiz-card-meta {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .leaderboard-card {
+        padding: 1.2rem;
+    }
+
+    .profile-card {
+        padding: 1.2rem;
+    }
 }

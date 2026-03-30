@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { FiCalendar, FiDownload, FiExternalLink, FiFileText } from 'react-icons/fi';
 import { supabase } from '../lib/supabaseClient';
+
+function logWorksheetDownload(id) {
+    supabase.from('download_logs').insert({ resource_type: 'worksheet', resource_id: id });
+}
 import './DailyWorksheet.css';
 
 const fadeUp = {
@@ -104,6 +108,7 @@ export default function DailyWorksheet() {
                                         rel="noopener noreferrer"
                                         download
                                         className="btn-primary worksheet-btn"
+                                        onClick={() => logWorksheetDownload(worksheet.id)}
                                     >
                                         <FiDownload /> Download
                                     </a>

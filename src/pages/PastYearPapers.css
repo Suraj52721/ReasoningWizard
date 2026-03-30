@@ -456,4 +456,25 @@
         margin-left: 0;
         text-align: right;
     }
+
+    .pyp-page {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .pyp-subject-wrap {
+        min-width: unset;
+        width: 100%;
+    }
+
+    .pyp-search-wrap {
+        min-width: unset;
+        width: 100%;
+    }
+}
+
+@media (max-width: 360px) {
+    .pyp-grid {
+        grid-template-columns: 1fr;
+    }
 }
