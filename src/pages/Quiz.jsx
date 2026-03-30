@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
-import { FiClock, FiCheckCircle, FiTarget, FiPlay, FiPause, FiMaximize, FiMinimize, FiArrowLeft, FiAlertCircle, FiCheck, FiX, FiTrendingUp, FiAward, FiBarChart2, FiPercent, FiShare2, FiRefreshCw, FiHome, FiEye, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiClock, FiCheckCircle, FiTarget, FiPlay, FiPause, FiMaximize, FiMinimize, FiArrowLeft, FiAlertCircle, FiCheck, FiX, FiTrendingUp, FiAward, FiBarChart2, FiPercent, FiShare2, FiRefreshCw, FiHome, FiEye, FiChevronLeft, FiChevronRight, FiFlag } from 'react-icons/fi';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import SEO from '../components/SEO';
 import './Quiz.css';
@@ -40,6 +40,13 @@ export default function Quiz() {
     const timerRef = useRef(null);
     const [sessionId, setSessionId] = useState(null);
     const [isResuming, setIsResuming] = useState(false);
+
+    // Report question
+    const [reportOpen, setReportOpen] = useState(false);
+    const [reportReason, setReportReason] = useState('');
+    const [reportDetails, setReportDetails] = useState('');
+    const [reportSubmitting, setReportSubmitting] = useState(false);
+    const [reportDone, setReportDone] = useState(false);
 
     const latestState = useRef({ answers, timeLeft, currentQ });
     useEffect(() => {
@@ -722,6 +729,26 @@ export default function Quiz() {
     const answeredCount = Object.keys(answers).length;
     const isLowTime = timeLeft <= 60;
 
+    async function submitReport() {
+        if (!reportReason) return;
+        setReportSubmitting(true);
+        await supabase.from('question_reports').insert({
+            question_id: currentQuestion.id,
+            quiz_id: id,
+            reporter_id: user?.id || null,
+            reason: reportReason,
+            details: reportDetails.trim() || null,
+        });
+        setReportSubmitting(false);
+        setReportDone(true);
+        setTimeout(() => {
+            setReportOpen(false);
+            setReportDone(false);
+            setReportReason('');
+            setReportDetails('');
+        }, 1800);
+    }
+
     return (
         <div className="quiz-page page-container">
             <SEO title={`Playing: ${quiz?.title}`} />
@@ -781,6 +808,9 @@ export default function Quiz() {
                     >
                         <div className="question-header">
                             <span className="question-num">Question {currentQ + 1} <span className="q-total">/ {questions.length}</span></span>
+                            <button className="report-btn" onClick={() => { setReportOpen(true); setReportDone(false); setReportReason(''); setReportDetails(''); }} title="Report this question">
+                                <FiFlag /> Report
+                            </button>
                         </div>
                         <h2 className="question-text">{currentQuestion?.question_text}</h2>
                         {currentQuestion?.image_url && (
@@ -877,6 +907,73 @@ export default function Quiz() {
                     )}
                 </AnimatePresence>
             </div>
+
+            {/* Report Question Modal */}
+            <AnimatePresence>
+                {reportOpen && (
+                    <motion.div
+                        className="report-overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setReportOpen(false)}
+                    >
+                        <motion.div
+                            className="report-modal glass-card"
+                            initial={{ scale: 0.85, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.85, opacity: 0, y: 20 }}
+                            transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {reportDone ? (
+                                <div className="report-done">
+                                    <FiCheck className="report-done-icon" />
+                                    <p>Thank you! Report submitted.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="report-modal-header">
+                                        <h3><FiFlag /> Report Question {currentQ + 1}</h3>
+                                        <button className="report-close" onClick={() => setReportOpen(false)}><FiX /></button>
+                                    </div>
+                                    <p className="report-modal-sub">What's the issue with this question?</p>
+                                    <div className="report-reasons">
+                                        {['Wrong answer marked', 'Typo / error in question', 'Wrong or missing image', 'Unclear question', 'Other'].map(r => (
+                                            <button
+                                                key={r}
+                                                className={`report-reason-btn ${reportReason === r ? 'selected' : ''}`}
+                                                onClick={() => setReportReason(r)}
+                                            >
+                                                {r}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <textarea
+                                        className="report-details"
+                                        placeholder="Additional details (optional)…"
+                                        value={reportDetails}
+                                        onChange={e => setReportDetails(e.target.value)}
+                                        rows={3}
+                                    />
+                                    <div className="report-modal-actions">
+                                        <button className="btn-secondary" onClick={() => setReportOpen(false)}>Cancel</button>
+                                        <motion.button
+                                            className="btn-primary"
+                                            onClick={submitReport}
+                                            disabled={!reportReason || reportSubmitting}
+                                            whileHover={{ scale: 1.03 }}
+                                            whileTap={{ scale: 0.97 }}
+                                        >
+                                            {reportSubmitting ? 'Submitting…' : 'Submit Report'}
+                                        </motion.button>
+                                    </div>
+                                </>
+                            )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

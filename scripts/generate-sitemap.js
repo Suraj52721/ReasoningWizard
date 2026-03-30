@@ -42,7 +42,8 @@ const staticPages = [
     { path: '/privacy-policy', changefreq: 'yearly', priority: '0.4' },
     { path: '/terms-of-service', changefreq: 'yearly', priority: '0.4' },
     { path: '/login', changefreq: 'monthly', priority: '0.5' },
-    { path: '/register', changefreq: 'monthly', priority: '0.6' }
+    { path: '/register', changefreq: 'monthly', priority: '0.6' },
+    { path: '/past-papers', changefreq: 'weekly', priority: '0.9' }
 ];
 
 async function generate() {

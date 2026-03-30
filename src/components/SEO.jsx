@@ -42,6 +42,11 @@ const routeSeo = {
     '/register': {
         title: 'Create Your Account',
         description: 'Create a free ReasoningWizard account and access quizzes, solutions, and progress tracking.'
+    },
+    '/past-papers': {
+        title: 'Past Year Papers',
+        description: 'Download free past year papers for 11+ exam preparation. Browse Easy, Medium, and Hard difficulty papers by subject including Maths, English, Reasoning and more.',
+        keywords: '11+ past papers, past year papers, 11 plus exam papers, reasoning past papers, maths past papers, English past papers, free exam papers UK'
     }
 };
 

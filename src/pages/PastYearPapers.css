@@ -6,7 +6,7 @@
     padding-right: 1.5rem;
 }
 
-/* Hero */
+/* ── Hero ───────────────────────────────────────────────── */
 .pyp-hero {
     padding: 2rem 0 1.5rem;
     text-align: center;
@@ -24,7 +24,7 @@
     margin-bottom: 1.5rem;
 }
 
-/* Quick-jump buttons */
+/* ── Quick-jump buttons ─────────────────────────────────── */
 .pyp-jump-btns {
     display: flex;
     justify-content: center;
@@ -63,7 +63,7 @@
     text-align: center;
 }
 
-/* Filters */
+/* ── Filters ─────────────────────────────────────────────── */
 .pyp-filters {
     display: flex;
     align-items: center;
@@ -144,7 +144,7 @@
     margin-left: auto;
 }
 
-/* Empty state */
+/* ── Empty / Loading ─────────────────────────────────────── */
 .pyp-empty {
     text-align: center;
     padding: 3rem 2rem;
@@ -167,11 +167,28 @@
     font-size: 0.9rem;
 }
 
-/* Sections */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 3rem;
+    color: var(--text-secondary);
+}
+
+.spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+}
+
+/* ── Sections ────────────────────────────────────────────── */
 .pyp-sections {
     display: flex;
     flex-direction: column;
-    gap: 2.5rem;
+    gap: 3rem;
 }
 
 .pyp-section {
@@ -182,7 +199,7 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    margin-bottom: 1.2rem;
+    margin-bottom: 1.4rem;
     padding-bottom: 0.75rem;
     border-bottom: 2px solid var(--diff-border);
 }
@@ -213,61 +230,167 @@
     border-radius: 999px;
 }
 
-/* Grid */
+/* ── Grid ────────────────────────────────────────────────── */
 .pyp-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.25rem;
 }
 
-/* Card */
+/* ── Card (vertical) ─────────────────────────────────────── */
 .pyp-card {
     display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    padding: 1rem 1.1rem;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
     transition: box-shadow 0.2s;
+    cursor: default;
 }
 
 .pyp-card:hover {
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
 }
 
-.pyp-card-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 10px;
+/* ── Thumbnail ───────────────────────────────────────────── */
+.pyp-thumb {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    background: var(--diff-gradient);
     display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
+    flex-direction: column;
+    overflow: hidden;
     flex-shrink: 0;
 }
 
-.pyp-card-body {
-    flex: 1;
-    min-width: 0;
+/* Top bar: logo + brand name */
+.pyp-thumb-topbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 8px 3px;
+    background: rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(4px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-.pyp-card-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    margin: 0 0 0.4rem;
+.pyp-thumb-logo {
+    width: 15px;
+    height: 15px;
+    object-fit: contain;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.pyp-thumb-brand {
+    font-size: 0.55rem;
+    font-weight: 800;
+    color: var(--diff-color);
+    letter-spacing: 0.01em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
+/* Decorative ruled lines */
+.pyp-thumb-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 5px 10px 2px;
+}
+
+.thumb-line {
+    display: block;
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.thumb-line.long   { width: 80%; }
+.thumb-line.medium { width: 55%; }
+
+/* Centred title area */
+.pyp-thumb-center {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+}
+
+.pyp-thumb-title {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: rgba(0, 0, 0, 0.75);
+    text-align: center;
+    line-height: 1.3;
+    word-break: break-word;
+    margin: 0;
+}
+
+/* Bottom footer bar */
+.pyp-thumb-footer {
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.pyp-thumb-diff-badge {
+    font-size: 0.55rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--diff-color);
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--diff-color);
+    padding: 1px 5px;
+    border-radius: 999px;
+}
+
+/* Corner fold */
+.pyp-thumb-fold {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 0 16px 16px;
+    border-color: transparent transparent rgba(255, 255, 255, 0.55) transparent;
+}
+
+/* ── Card info (below thumbnail) ─────────────────────────── */
+.pyp-card-info {
+    padding: 0.75rem 0.9rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.pyp-card-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.4;
+    color: var(--text-primary);
+    /* Show full name — no truncation */
+    word-break: break-word;
+}
+
 .pyp-card-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.35rem;
 }
 
 .meta-badge {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 600;
-    padding: 2px 8px;
+    padding: 2px 7px;
     border-radius: 999px;
     border: 1px solid var(--border);
     background: var(--input-bg);
@@ -284,19 +407,20 @@
     font-weight: 700;
 }
 
+/* ── Download button ─────────────────────────────────────── */
 .pyp-download-btn {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 0.45rem 0.85rem;
+    justify-content: center;
+    gap: 6px;
+    margin: 0 0.9rem 0.9rem;
+    padding: 0.5rem;
     border-radius: var(--radius-sm);
-    font-size: 0.82rem;
+    font-size: 0.85rem;
     font-weight: 700;
     text-decoration: none;
     background: var(--diff-color, var(--primary));
     color: #fff;
-    white-space: nowrap;
-    flex-shrink: 0;
     transition: opacity 0.2s, transform 0.15s;
 }
 
@@ -305,41 +429,22 @@
     transform: translateY(-1px);
 }
 
-/* Loading */
-.loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-    padding: 3rem;
-    color: var(--text-secondary);
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .pyp-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 1rem;
+    }
 }
 
-.spinner {
-    width: 36px;
-    height: 36px;
-    border: 3px solid var(--border);
-    border-top-color: var(--primary);
-    border-radius: 50%;
-}
-
-/* Responsive */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
     .pyp-title {
         font-size: 2rem;
     }
 
     .pyp-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .pyp-card {
-        flex-wrap: wrap;
-    }
-
-    .pyp-download-btn {
-        width: 100%;
-        justify-content: center;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
     }
 
     .pyp-filters {

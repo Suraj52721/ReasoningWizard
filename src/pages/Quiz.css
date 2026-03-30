@@ -221,12 +221,160 @@
 
 .question-header {
     margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .question-num {
     font-size: 0.85rem;
     color: var(--primary);
     font-weight: 600;
+}
+
+/* Report button */
+.report-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 10px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.report-btn:hover {
+    opacity: 1;
+    color: var(--error);
+    border-color: var(--error);
+}
+
+/* Report modal overlay */
+.report-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.report-modal {
+    width: 100%;
+    max-width: 420px;
+    padding: 1.5rem;
+    border-radius: var(--radius);
+}
+
+.report-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+}
+
+.report-modal-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 1rem;
+    font-weight: 800;
+    margin: 0;
+}
+
+.report-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+}
+
+.report-close:hover { color: var(--text-primary); }
+
+.report-modal-sub {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.9rem;
+}
+
+.report-reasons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.9rem;
+}
+
+.report-reason-btn {
+    text-align: left;
+    padding: 0.5rem 0.85rem;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.87rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.report-reason-btn:hover {
+    border-color: var(--primary);
+}
+
+.report-reason-btn.selected {
+    border-color: var(--primary);
+    background: rgba(var(--primary-rgb, 79,70,229), 0.1);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.report-details {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.87rem;
+    resize: vertical;
+    outline: none;
+    margin-bottom: 1rem;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.report-details:focus { border-color: var(--primary); }
+
+.report-modal-actions {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+}
+
+.report-done {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 0 0.5rem;
+    color: var(--success);
+    font-weight: 700;
+}
+
+.report-done-icon {
+    font-size: 2rem;
 }
 
 .q-total {

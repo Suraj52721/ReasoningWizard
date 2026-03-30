@@ -122,6 +122,10 @@ export default function Admin() {
     // Past papers tab
     const [pastPapers, setPastPapers] = useState([]);
     const [loadingPastPapers, setLoadingPastPapers] = useState(false);
+
+    // Reports tab
+    const [reports, setReports] = useState([]);
+    const [loadingReports, setLoadingReports] = useState(false);
     const [ppTitle, setPpTitle] = useState('');
     const [ppYear, setPpYear] = useState('');
     const [ppSubject, setPpSubject] = useState('11+ Mathematics');
@@ -137,6 +141,7 @@ export default function Admin() {
     useEffect(() => {
         if (tab === 'visitors') fetchVisitors();
         if (tab === 'pastpapers') fetchPastPapers();
+        if (tab === 'reports') fetchReports();
     }, [tab]);
 
     async function fetchQuizzes() {
@@ -153,7 +158,7 @@ export default function Admin() {
     async function fetchWorksheets() {
         const { data } = await supabase
             .from('daily_worksheets')
-            .select('id, quiz_id, title, subject, worksheet_date, file_url, file_name, file_path')
+            .select('id, quiz_id, title, subject, worksheet_date, file_url, file_name, file_path, download_count')
             .order('worksheet_date', { ascending: false })
             .limit(200);
         setWorksheets(data || []);
@@ -208,6 +213,22 @@ export default function Admin() {
         await supabase.from('past_papers').delete().eq('id', paper.id);
         setPastPapers(prev => prev.filter(p => p.id !== paper.id));
         setMessage({ type: 'success', text: 'Paper deleted.' });
+    }
+
+    async function fetchReports() {
+        setLoadingReports(true);
+        const { data } = await supabase
+            .from('question_reports')
+            .select('*, questions(question_text, quiz_id), quizzes(title)')
+            .order('created_at', { ascending: false })
+            .limit(200);
+        setReports(data || []);
+        setLoadingReports(false);
+    }
+
+    async function updateReportStatus(reportId, status) {
+        await supabase.from('question_reports').update({ status }).eq('id', reportId);
+        setReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r));
     }
 
     async function loadQuizForEditing(quiz) {
@@ -595,23 +616,38 @@ export default function Admin() {
     async function fetchVisitors() {
         setLoadingVisitors(true);
         try {
-            const { data, error } = await supabase
-                .from('site_visitors')
-                .select('*')
-                .order('visited_at', { ascending: false })
-                .limit(500);
-            if (error) throw error;
-            const v = data || [];
-            setVisitors(v);
-
-            // Calculate stats
             const today = new Date().toISOString().split('T')[0];
-            const fingerprints = new Set(v.filter(r => r.visitor_fingerprint).map(r => r.visitor_fingerprint));
+
+            // Accurate counts via separate count queries
+            const [{ count: total }, { count: todayCount }, { count: loggedIn }] = await Promise.all([
+                supabase.from('site_visitors').select('*', { count: 'exact', head: true }),
+                supabase.from('site_visitors').select('*', { count: 'exact', head: true }).gte('visited_at', `${today}T00:00:00`),
+                supabase.from('site_visitors').select('*', { count: 'exact', head: true }).eq('is_logged_in', true),
+            ]);
+
+            // Fetch all records in 1 000-row batches (no hard cap)
+            let allVisitors = [];
+            let from = 0;
+            const BATCH = 1000;
+            while (true) {
+                const { data, error } = await supabase
+                    .from('site_visitors')
+                    .select('*')
+                    .order('visited_at', { ascending: false })
+                    .range(from, from + BATCH - 1);
+                if (error) throw error;
+                allVisitors = allVisitors.concat(data || []);
+                if (!data || data.length < BATCH) break;
+                from += BATCH;
+            }
+
+            setVisitors(allVisitors);
+            const fingerprints = new Set(allVisitors.filter(r => r.visitor_fingerprint).map(r => r.visitor_fingerprint));
             setVisitorStats({
-                total: v.length,
+                total: total ?? allVisitors.length,
                 unique: fingerprints.size,
-                today: v.filter(r => r.visited_at && r.visited_at.startsWith(today)).length,
-                loggedIn: v.filter(r => r.is_logged_in).length,
+                today: todayCount ?? 0,
+                loggedIn: loggedIn ?? 0,
             });
         } catch (err) {
             console.error('Failed to fetch visitors:', err);
@@ -670,6 +706,7 @@ export default function Admin() {
         ...(!isReadOnly ? [{ id: 'create', label: 'Create Quiz', icon: <FiPlus /> }] : [{ id: 'create', label: 'Edit Quiz', icon: <FiEdit2 /> }]),
         { id: 'manage', label: 'Manage Quizzes', icon: <FiList /> },
         { id: 'pastpapers', label: 'Past Papers', icon: <FiFileText /> },
+        { id: 'reports', label: `Reports${reports.filter(r => r.status === 'pending').length ? ` (${reports.filter(r => r.status === 'pending').length})` : ''}`, icon: <FiAlertTriangle /> },
         { id: 'visitors', label: 'Visitors', icon: <FiUsers /> },
     ];
 
@@ -1054,11 +1091,16 @@ Exp: 5 times 5 equals 25.`}
                                                     <div className="manage-meta">
                                                         <span className="manage-badge">{quiz.subject}</span>
                                                         {quiz.is_draft && <span className="manage-badge" style={{ background: 'rgba(255,165,0,0.1)', color: 'orange', borderColor: 'rgba(255,165,0,0.2)' }}>Draft</span>}
-                                                        {worksheets.some(w => w.quiz_id === quiz.id) && (
-                                                            <span className="manage-badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.2)' }}>
-                                                                <FiFileText /> Worksheet
-                                                            </span>
-                                                        )}
+                                                        {(() => { const ws = worksheets.find(w => w.quiz_id === quiz.id); return ws ? (
+                                                            <>
+                                                                <span className="manage-badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.2)' }}>
+                                                                    <FiFileText /> Worksheet
+                                                                </span>
+                                                                <span className="manage-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.25)' }} title="Worksheet downloads">
+                                                                    ↓ {ws.download_count ?? 0}
+                                                                </span>
+                                                            </>
+                                                        ) : null; })()}
                                                         <span><FiCalendar /> {quiz.quiz_date}</span>
                                                         <span><FiClock /> {quiz.duration_minutes} min</span>
                                                         <span><FiFileText /> {quiz.questions?.[0]?.count || 0} questions</span>
@@ -1185,6 +1227,9 @@ Exp: 5 times 5 equals 25.`}
                                                                 <span className="manage-badge">{paper.subject}</span>
                                                                 {paper.year && <span className="manage-badge">{paper.year}</span>}
                                                                 <span className="manage-badge" style={{ background: `${color}15`, color, borderColor: `${color}30` }}>{diff}</span>
+                                                                <span className="manage-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.25)' }} title="Total downloads">
+                                                                    ↓ {paper.download_count ?? 0}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                         <div className="manage-card-actions" style={{ display: 'flex', gap: '0.5rem' }}>
@@ -1210,6 +1255,67 @@ Exp: 5 times 5 equals 25.`}
                                     );
                                 })
                             )}
+                        </motion.div>
+                    )}
+
+                    {tab === 'reports' && (
+                        <motion.div key="reports" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+                            <div className="manage-section">
+                                {loadingReports ? (
+                                    <div className="loading-state">
+                                        <motion.div className="spinner" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
+                                        <p>Loading reports…</p>
+                                    </div>
+                                ) : reports.length === 0 ? (
+                                    <div className="empty-state glass-card">
+                                        <FiAlertTriangle />
+                                        <h3>No reports yet</h3>
+                                        <p>Reported questions will appear here.</p>
+                                    </div>
+                                ) : (
+                                    <div className="quiz-manage-list">
+                                        {reports.map((report, i) => {
+                                            const statusColors = { pending: '#f59e0b', reviewed: '#3b82f6', resolved: '#22c55e', dismissed: '#6b7280' };
+                                            const color = statusColors[report.status] || '#6b7280';
+                                            return (
+                                                <motion.div
+                                                    key={report.id}
+                                                    className="manage-card glass-card"
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: i * 0.04 }}
+                                                >
+                                                    <div className="manage-card-info">
+                                                        <h3 style={{ fontSize: '0.9rem' }}>{report.questions?.question_text?.slice(0, 120) || 'Unknown question'}{report.questions?.question_text?.length > 120 ? '…' : ''}</h3>
+                                                        <div className="manage-meta">
+                                                            <span className="manage-badge">{report.quizzes?.title || 'Unknown quiz'}</span>
+                                                            <span className="manage-badge" style={{ background: `${color}15`, color, borderColor: `${color}30`, fontWeight: 700 }}>{report.status}</span>
+                                                            <span className="manage-badge" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', borderColor: 'rgba(239,68,68,0.25)' }}>{report.reason}</span>
+                                                            <span><FiCalendar /> {new Date(report.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                                        </div>
+                                                        {report.details && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.3rem', marginBottom: 0 }}>{report.details}</p>}
+                                                    </div>
+                                                    <div className="manage-card-actions" style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                                        {['pending', 'reviewed', 'resolved', 'dismissed'].filter(s => s !== report.status).map(s => (
+                                                            <motion.button
+                                                                key={s}
+                                                                className="btn-secondary"
+                                                                style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                                                                onClick={() => updateReportStatus(report.id, s)}
+                                                                whileHover={{ scale: 1.05 }}
+                                                                whileTap={{ scale: 0.95 }}
+                                                                title={`Mark as ${s}`}
+                                                            >
+                                                                {s}
+                                                            </motion.button>
+                                                        ))}
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </motion.div>
                     )}
 
@@ -1279,122 +1385,12 @@ Exp: 5 times 5 equals 25.`}
                                 ))}
                             </div>
 
-                            {/* Visitor Data Table */}
-                            <motion.div
-                                className="visitor-table-section glass-card"
-                                initial={{ opacity: 0, y: 15 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.5 }}
-                            >
-                                <div className="visitor-table-header">
-                                    <h3 className="form-section-title"><FiList /> Visitor Log</h3>
-                                    <div className="visitor-search">
-                                        <FiSearch />
-                                        <input
-                                            className="admin-input"
-                                            placeholder="Search visitors..."
-                                            value={visitorSearch}
-                                            onChange={e => { setVisitorSearch(e.target.value); setVisitorPage(0); }}
-                                        />
-                                    </div>
+                            {loadingVisitors && (
+                                <div className="loading-state">
+                                    <motion.div className="spinner" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
+                                    <p>Loading visitor data…</p>
                                 </div>
-
-                                {loadingVisitors ? (
-                                    <div className="loading-state">
-                                        <motion.div className="spinner" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
-                                        <p>Loading visitors...</p>
-                                    </div>
-                                ) : filteredVisitors.length === 0 ? (
-                                    <div className="empty-state">
-                                        <FiUsers />
-                                        <h3>No visitor data</h3>
-                                        <p>{visitorSearch ? 'No results match your search.' : 'Visitor data will appear here once tracking is active.'}</p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="visitor-table-wrapper">
-                                            <table className="visitor-table">
-                                                <thead>
-                                                    <tr>
-                                                        {[
-                                                            { key: 'visited_at', label: 'Date' },
-                                                            { key: 'page_url', label: 'Page' },
-                                                            { key: 'browser', label: 'Browser' },
-                                                            { key: 'os', label: 'OS' },
-                                                            { key: 'device_type', label: 'Device' },
-                                                            { key: 'country', label: 'Country' },
-                                                            { key: 'referrer_url', label: 'Referrer' },
-                                                            { key: 'utm_source', label: 'UTM' },
-                                                            { key: 'is_logged_in', label: 'User' },
-                                                        ].map(col => (
-                                                            <th
-                                                                key={col.key}
-                                                                className={`sortable-th ${visitorSort.field === col.key ? 'sorted' : ''}`}
-                                                                onClick={() => toggleVisitorSort(col.key)}
-                                                            >
-                                                                {col.label}
-                                                                {visitorSort.field === col.key && (
-                                                                    visitorSort.dir === 'desc' ? <FiArrowDown /> : <FiArrowUp />
-                                                                )}
-                                                            </th>
-                                                        ))}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {pagedVisitors.map((v, i) => (
-                                                        <tr key={v.id || i}>
-                                                            <td className="td-date">
-                                                                {v.visited_at ? new Date(v.visited_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
-                                                            </td>
-                                                            <td className="td-page" title={v.page_url}>{v.page_url || '—'}</td>
-                                                            <td>{v.browser || '—'}</td>
-                                                            <td>{v.os || '—'}</td>
-                                                            <td>
-                                                                <span className={`device-badge ${v.device_type}`}>
-                                                                    {v.device_type === 'mobile' ? <FiSmartphone /> : v.device_type === 'tablet' ? <FiMonitor /> : <FiMonitor />}
-                                                                    {v.device_type || '—'}
-                                                                </span>
-                                                            </td>
-                                                            <td>{v.country || '—'}</td>
-                                                            <td className="td-referrer" title={v.referrer_url}>{v.referrer_url ? (() => { try { return new URL(v.referrer_url).hostname; } catch { return v.referrer_url; } })() : '(direct)'}</td>
-                                                            <td>{v.utm_source || '—'}</td>
-                                                            <td>
-                                                                {v.is_logged_in
-                                                                    ? <span className="user-badge logged-in" title={v.user_email}><FiCheck /> {v.user_email ? v.user_email.split('@')[0] : 'User'}</span>
-                                                                    : <span className="user-badge anonymous">Anonymous</span>
-                                                                }
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-
-                                        {/* Pagination */}
-                                        {totalVisitorPages > 1 && (
-                                            <div className="visitor-pagination">
-                                                <button
-                                                    className="pagination-btn"
-                                                    disabled={visitorPage === 0}
-                                                    onClick={() => setVisitorPage(p => p - 1)}
-                                                >
-                                                    <FiChevronLeft />
-                                                </button>
-                                                <span className="pagination-info">
-                                                    Page {visitorPage + 1} of {totalVisitorPages} ({filteredVisitors.length} results)
-                                                </span>
-                                                <button
-                                                    className="pagination-btn"
-                                                    disabled={visitorPage >= totalVisitorPages - 1}
-                                                    onClick={() => setVisitorPage(p => p + 1)}
-                                                >
-                                                    <FiChevronRight />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                            </motion.div>
+                            )}
                         </motion.div>
                     )}
                 </AnimatePresence>

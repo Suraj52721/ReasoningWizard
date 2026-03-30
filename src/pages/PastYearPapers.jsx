@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabaseClient';
 import { FiDownload, FiFileText, FiFilter, FiSearch, FiChevronDown } from 'react-icons/fi';
 import SEO from '../components/SEO';
+import logo from '../assets/logo.png';
 import './PastYearPapers.css';
 
 const SUBJECTS = ['All', '11+ Mathematics', 'Science', 'English', 'History', 'Geography', 'General Knowledge', 'Reasoning', 'Verbal Reasoning', 'Non-Verbal Reasoning'];
@@ -10,15 +11,43 @@ const SUBJECTS = ['All', '11+ Mathematics', 'Science', 'English', 'History', 'Ge
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 
 const DIFFICULTY_CONFIG = {
-    Easy:   { color: '#22c55e', bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.25)'   },
-    Medium: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.25)'  },
-    Hard:   { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.25)'   },
+    Easy:   { color: '#22c55e', bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.25)',   gradient: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' },
+    Medium: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.25)',  gradient: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' },
+    Hard:   { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.25)',   gradient: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' },
 };
 
 const fadeUp = {
     hidden: { opacity: 0, y: 20 },
     visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.06, duration: 0.4 } })
 };
+
+function PaperThumbnail({ title, difficulty }) {
+    const cfg = DIFFICULTY_CONFIG[difficulty];
+    return (
+        <div className="pyp-thumb" style={{ '--diff-color': cfg.color, '--diff-bg': cfg.bg, '--diff-gradient': cfg.gradient }}>
+            {/* Top bar with logo */}
+            <div className="pyp-thumb-topbar">
+                <img src={logo} alt="ReasoningWizard" className="pyp-thumb-logo" />
+                <span className="pyp-thumb-brand">ReasoningWizard</span>
+            </div>
+            {/* Decorative lines mimicking text */}
+            <div className="pyp-thumb-lines">
+                <span className="thumb-line long" />
+                <span className="thumb-line medium" />
+            </div>
+            {/* Paper title centred */}
+            <div className="pyp-thumb-center">
+                <p className="pyp-thumb-title">{title}</p>
+            </div>
+            {/* Bottom accent */}
+            <div className="pyp-thumb-footer">
+                <span className="pyp-thumb-diff-badge">{difficulty}</span>
+            </div>
+            {/* Subtle corner fold */}
+            <span className="pyp-thumb-fold" />
+        </div>
+    );
+}
 
 export default function PastYearPapers() {
     const [papers, setPapers] = useState([]);
@@ -182,13 +211,14 @@ export default function PastYearPapers() {
                                                     variants={fadeUp}
                                                     initial="hidden"
                                                     animate="visible"
-                                                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                                                    whileHover={{ y: -6, transition: { duration: 0.2 } }}
                                                 >
-                                                    <div className="pyp-card-icon" style={{ background: cfg.bg, color: cfg.color }}>
-                                                        <FiFileText />
-                                                    </div>
-                                                    <div className="pyp-card-body">
-                                                        <h3 className="pyp-card-title">{paper.title}</h3>
+                                                    {/* Thumbnail */}
+                                                    <PaperThumbnail title={paper.title} difficulty={difficulty} />
+
+                                                    {/* Info below thumbnail */}
+                                                    <div className="pyp-card-info">
+                                                        <p className="pyp-card-title">{paper.title}</p>
                                                         <div className="pyp-card-meta">
                                                             <span className="meta-badge subject-badge">{paper.subject}</span>
                                                             {paper.year && <span className="meta-badge year-badge">{paper.year}</span>}
@@ -200,6 +230,7 @@ export default function PastYearPapers() {
                                                             </span>
                                                         </div>
                                                     </div>
+
                                                     <a
                                                         href={paper.file_url}
                                                         target="_blank"
@@ -207,6 +238,7 @@ export default function PastYearPapers() {
                                                         download
                                                         className="pyp-download-btn"
                                                         style={{ '--diff-color': cfg.color }}
+                                                        onClick={() => supabase.rpc('increment_download_count', { p_table: 'past_papers', p_id: paper.id })}
                                                     >
                                                         <FiDownload /> Download
                                                     </a>

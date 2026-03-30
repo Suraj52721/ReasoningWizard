@@ -14,8 +14,14 @@
   </url>
   <url>
         <loc>https://reasoningwizard.com/questions</loc>
-    <lastmod>2026-03-18</lastmod>
+    <lastmod>2026-03-31</lastmod>
         <changefreq>daily</changefreq>
+        <priority>0.9</priority>
+  </url>
+  <url>
+        <loc>https://reasoningwizard.com/past-papers</loc>
+    <lastmod>2026-03-31</lastmod>
+        <changefreq>weekly</changefreq>
         <priority>0.9</priority>
   </url>
   <url>
