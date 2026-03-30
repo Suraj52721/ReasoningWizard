@@ -238,7 +238,7 @@ export default function PastYearPapers() {
                                                         download
                                                         className="pyp-download-btn"
                                                         style={{ '--diff-color': cfg.color }}
-                                                        onClick={() => supabase.rpc('increment_download_count', { p_table: 'past_papers', p_id: paper.id })}
+                                                        onClick={() => supabase.from('download_logs').insert({ resource_type: 'past_paper', resource_id: paper.id })}
                                                     >
                                                         <FiDownload /> Download
                                                     </a>

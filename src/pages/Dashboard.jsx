@@ -231,7 +231,7 @@ export default function Dashboard() {
                 )}
                 {worksheet && (
                     user ? (
-                        <a href={worksheet.file_url} download={worksheet.file_name} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: '0.5rem' }} onClick={() => supabase.rpc('increment_download_count', { p_table: 'daily_worksheets', p_id: worksheet.id })}>
+                        <a href={worksheet.file_url} download={worksheet.file_name} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: '0.5rem' }} onClick={() => supabase.from('download_logs').insert({ resource_type: 'worksheet', resource_id: worksheet.id })}>
                             <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" whileHover={{ scale: 1.02 }}>
                                 <FiDownload /> Download Worksheet
                             </motion.button>
