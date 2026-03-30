@@ -119,6 +119,16 @@ export default function Admin() {
     const [existingWorksheet, setExistingWorksheet] = useState(null); // worksheet already linked to quiz being edited
     const [worksheetRemoved, setWorksheetRemoved] = useState(false);  // user clicked Remove on existing worksheet
 
+    // Past papers tab
+    const [pastPapers, setPastPapers] = useState([]);
+    const [loadingPastPapers, setLoadingPastPapers] = useState(false);
+    const [ppTitle, setPpTitle] = useState('');
+    const [ppYear, setPpYear] = useState('');
+    const [ppSubject, setPpSubject] = useState('11+ Mathematics');
+    const [ppDifficulty, setPpDifficulty] = useState('Medium');
+    const [ppFile, setPpFile] = useState(null);
+    const [ppSaving, setPpSaving] = useState(false);
+
     useEffect(() => {
         fetchQuizzes();
         fetchWorksheets();
@@ -126,6 +136,7 @@ export default function Admin() {
 
     useEffect(() => {
         if (tab === 'visitors') fetchVisitors();
+        if (tab === 'pastpapers') fetchPastPapers();
     }, [tab]);
 
     async function fetchQuizzes() {
@@ -146,6 +157,57 @@ export default function Admin() {
             .order('worksheet_date', { ascending: false })
             .limit(200);
         setWorksheets(data || []);
+    }
+
+    async function fetchPastPapers() {
+        setLoadingPastPapers(true);
+        const { data } = await supabase
+            .from('past_papers')
+            .select('*')
+            .order('year', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false });
+        setPastPapers(data || []);
+        setLoadingPastPapers(false);
+    }
+
+    async function savePastPaper() {
+        if (!ppTitle.trim()) { setMessage({ type: 'error', text: 'Title is required.' }); return; }
+        if (!ppFile) { setMessage({ type: 'error', text: 'Please select a PDF file.' }); return; }
+        setPpSaving(true);
+        try {
+            const safeFileName = ppFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const filePath = `${ppDifficulty.toLowerCase()}/${Date.now()}_${safeFileName}`;
+            const { error: uploadError } = await supabase.storage
+                .from('past_papers')
+                .upload(filePath, ppFile, { contentType: 'application/pdf', upsert: false });
+            if (uploadError) throw uploadError;
+            const { data: publicData } = supabase.storage.from('past_papers').getPublicUrl(filePath);
+            const { error: insertError } = await supabase.from('past_papers').insert({
+                title: ppTitle.trim(),
+                year: ppYear ? parseInt(ppYear) : null,
+                subject: ppSubject,
+                difficulty: ppDifficulty,
+                file_name: ppFile.name,
+                file_path: filePath,
+                file_url: publicData.publicUrl,
+                uploaded_by: (await supabase.auth.getUser()).data.user?.id,
+            });
+            if (insertError) throw insertError;
+            setMessage({ type: 'success', text: 'Past paper uploaded successfully!' });
+            setPpTitle(''); setPpYear(''); setPpFile(null); setPpDifficulty('Medium'); setPpSubject('11+ Mathematics');
+            fetchPastPapers();
+        } catch (err) {
+            setMessage({ type: 'error', text: `Upload failed: ${err.message}` });
+        }
+        setPpSaving(false);
+    }
+
+    async function deletePastPaper(paper) {
+        if (!window.confirm(`Delete "${paper.title}"? This cannot be undone.`)) return;
+        await supabase.storage.from('past_papers').remove([paper.file_path]);
+        await supabase.from('past_papers').delete().eq('id', paper.id);
+        setPastPapers(prev => prev.filter(p => p.id !== paper.id));
+        setMessage({ type: 'success', text: 'Paper deleted.' });
     }
 
     async function loadQuizForEditing(quiz) {
@@ -607,6 +669,7 @@ export default function Admin() {
     const tabs = [
         ...(!isReadOnly ? [{ id: 'create', label: 'Create Quiz', icon: <FiPlus /> }] : [{ id: 'create', label: 'Edit Quiz', icon: <FiEdit2 /> }]),
         { id: 'manage', label: 'Manage Quizzes', icon: <FiList /> },
+        { id: 'pastpapers', label: 'Past Papers', icon: <FiFileText /> },
         { id: 'visitors', label: 'Visitors', icon: <FiUsers /> },
     ];
 
@@ -1029,6 +1092,124 @@ Exp: 5 times 5 equals 25.`}
                                     </div>
                                 )}
                             </div>
+                        </motion.div>
+                    )}
+
+                    {tab === 'pastpapers' && (
+                        <motion.div key="pastpapers" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+                            {/* Upload form */}
+                            {!isReadOnly && (
+                                <div className="form-section glass-card" style={{ marginBottom: '1.5rem' }}>
+                                    <h2 className="form-section-title"><FiUpload /> Upload Past Paper</h2>
+                                    <div className="form-grid">
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label>Title *</label>
+                                            <input className="admin-input" placeholder="e.g. 2023 Maths Paper 1" value={ppTitle} onChange={e => setPpTitle(e.target.value)} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Subject</label>
+                                            <select className="admin-input" value={ppSubject} onChange={e => setPpSubject(e.target.value)}>
+                                                {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Year (optional)</label>
+                                            <input className="admin-input" type="number" placeholder="e.g. 2023" min={2000} max={2099} value={ppYear} onChange={e => setPpYear(e.target.value)} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Difficulty</label>
+                                            <select className="admin-input" value={ppDifficulty} onChange={e => setPpDifficulty(e.target.value)}>
+                                                <option value="Easy">Easy</option>
+                                                <option value="Medium">Medium</option>
+                                                <option value="Hard">Hard</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>PDF File *</label>
+                                            <label className="file-upload-label worksheet-upload-label">
+                                                <FiUpload /> {ppFile ? ppFile.name : 'Select PDF'}
+                                                <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => setPpFile(e.target.files[0] || null)} />
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <motion.button
+                                        className="btn-primary"
+                                        onClick={savePastPaper}
+                                        disabled={ppSaving}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        style={{ marginTop: '0.5rem' }}
+                                    >
+                                        {ppSaving ? 'Uploading…' : <><FiUpload /> Upload Paper</>}
+                                    </motion.button>
+                                </div>
+                            )}
+
+                            {/* Difficulty sections */}
+                            {loadingPastPapers ? (
+                                <div className="loading-state">
+                                    <motion.div className="spinner" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
+                                    <p>Loading past papers…</p>
+                                </div>
+                            ) : pastPapers.length === 0 ? (
+                                <div className="empty-state glass-card">
+                                    <FiFileText />
+                                    <h3>No past papers yet</h3>
+                                    <p>Upload your first paper using the form above.</p>
+                                </div>
+                            ) : (
+                                ['Easy', 'Medium', 'Hard'].map(diff => {
+                                    const list = pastPapers.filter(p => p.difficulty === diff);
+                                    if (list.length === 0) return null;
+                                    const diffColors = { Easy: '#22c55e', Medium: '#f59e0b', Hard: '#ef4444' };
+                                    const color = diffColors[diff];
+                                    return (
+                                        <div key={diff} style={{ marginBottom: '1.5rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: `2px solid ${color}30` }}>
+                                                <span style={{ width: 12, height: 12, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                                                <h3 style={{ margin: 0, color, fontSize: '1.1rem', fontWeight: 800 }}>{diff}</h3>
+                                                <span className="manage-badge" style={{ background: `${color}15`, color, borderColor: `${color}30`, marginLeft: 'auto' }}>{list.length}</span>
+                                            </div>
+                                            <div className="quiz-manage-list">
+                                                {list.map((paper, i) => (
+                                                    <motion.div
+                                                        key={paper.id}
+                                                        className="manage-card glass-card"
+                                                        initial={{ opacity: 0, y: 10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: i * 0.04 }}
+                                                    >
+                                                        <div className="manage-card-info">
+                                                            <h3>{paper.title}</h3>
+                                                            <div className="manage-meta">
+                                                                <span className="manage-badge">{paper.subject}</span>
+                                                                {paper.year && <span className="manage-badge">{paper.year}</span>}
+                                                                <span className="manage-badge" style={{ background: `${color}15`, color, borderColor: `${color}30` }}>{diff}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="manage-card-actions" style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            <a href={paper.file_url} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', padding: '0.4rem 0.7rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }} title="View PDF">
+                                                                <FiExternalLink />
+                                                            </a>
+                                                            {!isReadOnly && (
+                                                                <motion.button
+                                                                    className="btn-delete"
+                                                                    onClick={() => deletePastPaper(paper)}
+                                                                    whileHover={{ scale: 1.05 }}
+                                                                    whileTap={{ scale: 0.95 }}
+                                                                    title="Delete"
+                                                                >
+                                                                    <FiTrash2 />
+                                                                </motion.button>
+                                                            )}
+                                                        </div>
+                                                    </motion.div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </motion.div>
                     )}
 

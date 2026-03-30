@@ -20,6 +20,7 @@ import Dashboard from './pages/Dashboard';
 import Quiz from './pages/Quiz';
 import QuizSolutions from './pages/QuizSolutions';
 import Admin from './pages/Admin';
+import PastYearPapers from './pages/PastYearPapers';
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/questions" element={<Questions />} />
+              <Route path="/past-papers" element={<PastYearPapers />} />
               <Route path="/question/:questionId" element={<QuestionDetail />} />
 <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/quiz/:id" element={
