@@ -16,10 +16,10 @@ import SEO from '../components/SEO';
 export default function Contact() {
 
     const contactInfo = [
-        { icon: <FiMail />, label: 'Email', value: 'support@reasoningwizard.com', href: 'mailto:support@reasoningwizard.com' },
+        { icon: <FiMail />, label: 'Email', value: 'ankur233yadav@gmail.com', href: 'mailto:ankur233yadav@gmail.com' },
         { icon: <FiPhone />, label: 'Phone', value: '+919560103627', href: 'tel:+919560103627' },
         { icon: <FiFacebook />, label: 'Facebook', value: 'Reasoning Wizard', href: 'https://www.facebook.com/share/1DWaXgeZ1c/' },
-        { icon: <FiMapPin />, label: 'Address', value: 'London, United Kingdom', href: null },
+        { icon: <FiMapPin />, label: 'Address', value: 'Haryana, India', href: null },
         { icon: <FiClock />, label: 'Hours', value: 'Mon–Fri, 9am–6pm GMT', href: null },
     ];
 
