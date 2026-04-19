@@ -51,7 +51,7 @@ export default function PrivacyPolicy() {
 
                     <h2 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', marginBottom: '1rem' }}>4. Contact Us</h2>
                     <p>
-                        If you have any questions about this Privacy Policy, please contact us at <a href="mailto:support@reasoningwizard.com" style={{ color: 'var(--primary)' }}>privacy@reasoningwizard.com</a>.
+                        If you have any questions about this Privacy Policy, please contact us at <a href="mailto:support@reasoningwizard.com" style={{ color: 'var(--primary)' }}>support@reasoningwizard.com</a>.
                     </p>
                 </motion.div>
             </div>

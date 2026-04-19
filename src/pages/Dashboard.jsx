@@ -104,6 +104,8 @@ export default function Dashboard() {
             .neq('is_draft', true)
             .order('quiz_date', { ascending: false });
 
+        const dashboardOnlyQuizzes = (quizzesData || []).filter(q => q.quiz_mode !== 'premium');
+
         let attemptsData = [], sessionsData = [];
         if (user) {
             const { data: aData } = await supabase
@@ -122,7 +124,7 @@ export default function Dashboard() {
             .from('daily_worksheets')
             .select('id, quiz_id, file_url, file_name');
 
-        setQuizzes(quizzesData || []);
+        setQuizzes(dashboardOnlyQuizzes);
         setAttempts(attemptsData);
         setSessions(sessionsData);
         setWorksheets(wsData || []);

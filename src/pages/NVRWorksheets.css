@@ -1,0 +1,783 @@
+.nvr-page {
+  max-width: 1100px;
+  margin: 1.5rem auto 4rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  padding-bottom: 4rem;
+}
+
+/* ── Toast ───────────────────────────────────────────────── */
+.nvr-toast {
+  position: fixed;
+  top: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.2rem;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+}
+
+.nvr-toast-success {
+  background: var(--success);
+  color: #fff;
+}
+
+.nvr-toast-error {
+  background: var(--error);
+  color: #fff;
+}
+
+.nvr-toast-info {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.nvr-toast button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  margin-left: 0.5rem;
+  display: flex;
+}
+
+/* ── Hero ───────────────────────────────────────────────── */
+.nvr-hero {
+  padding: 2rem 0 1.5rem;
+}
+
+.nvr-hero-inner {
+  display: flex;
+  gap: 2.5rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.nvr-hero-text {
+  flex: 1;
+  min-width: 280px;
+}
+
+.nvr-eyebrow {
+  display: inline-block;
+  background: var(--primary-glow);
+  color: var(--primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.nvr-title {
+  font-size: 2.6rem;
+  font-weight: 900;
+  line-height: 1.15;
+  margin-bottom: 0.65rem;
+}
+
+.nvr-subtitle {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  line-height: 1.65;
+  margin-bottom: 1.25rem;
+  max-width: 520px;
+}
+
+.nvr-features-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nvr-features-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.feat-check {
+  color: var(--success);
+  flex-shrink: 0;
+  font-size: 0.95rem;
+}
+
+/* ── Price Card ─────────────────────────────────────────── */
+.nvr-price-card {
+  width: 300px;
+  flex-shrink: 0;
+  padding: 1.75rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.price-card-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary);
+  background: var(--primary-glow);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  align-self: flex-start;
+}
+
+.price-main-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+}
+
+.price-amount {
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.price-period {
+  font-size: 1rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.price-desc {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.price-perks {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.25rem 0;
+}
+
+.price-perks li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.price-perks li svg {
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+.payment-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.83rem;
+  color: var(--error);
+  background: rgba(232, 54, 78, 0.08);
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
+}
+
+.payment-success-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.83rem;
+  color: var(--success);
+  background: rgba(0, 184, 122, 0.08);
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
+}
+
+.nvr-sub-btn {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  margin-top: 0.25rem;
+}
+
+.price-secure-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Coupon Section ────────────────────────────────────── */
+.nvr-coupon-section {
+  margin-top: 0.75rem;
+}
+
+.nvr-coupon-row {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--input-bg);
+}
+
+.nvr-coupon-icon {
+  padding: 0.5rem 0 0.5rem 0.6rem;
+  font-size: 1rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.nvr-coupon-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.5rem 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-width: 0;
+}
+
+.nvr-coupon-apply {
+  border: none;
+  background: var(--primary);
+  color: var(--text-on-primary);
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.nvr-coupon-apply:hover {
+  background: var(--primary-dark);
+}
+
+.nvr-coupon-apply:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.nvr-coupon-error {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--error);
+  margin-top: 0.35rem;
+}
+
+.nvr-coupon-success {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--success);
+  margin-top: 0.35rem;
+  font-weight: 600;
+}
+
+/* ── Subscribed state ───────────────────────────────────── */
+.nvr-subscribed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.subscribed-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--primary);
+}
+
+.sub-star {
+  font-size: 1.1rem;
+}
+
+.sub-expiry {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.sub-msg {
+  font-size: 0.88rem;
+  color: var(--success);
+}
+
+.sub-perks {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.sub-perks li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.sub-perks li svg {
+  color: var(--success);
+}
+
+/* ── Stats Bar ──────────────────────────────────────────── */
+.nvr-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0 2rem;
+}
+
+.nvr-stat {
+  padding: 1rem;
+  text-align: center;
+  border-radius: var(--radius);
+}
+
+.nvr-stat-val {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--primary);
+}
+
+.nvr-stat-lbl {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+  font-weight: 500;
+}
+
+/* ── Table Section ──────────────────────────────────────── */
+.nvr-section-heading {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-bottom: 1.25rem;
+}
+
+.nvr-table-wrap {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  padding: 0.95rem;
+}
+
+.nvr-table-wrap .paper-grid {
+  gap: 0.95rem;
+  padding: 0.85rem 0 0.25rem;
+}
+
+/* Sub-section headers inside the table wrap */
+.table-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.free-header {
+  background: rgba(0, 184, 122, 0.08);
+  border-bottom: 1px solid rgba(0, 184, 122, 0.15);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.premium-header {
+  background: var(--primary-glow);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.locked-header {
+  background: rgba(232, 54, 78, 0.06);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid rgba(232, 54, 78, 0.15);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.free-label-tag {
+  color: var(--success);
+}
+
+.premium-header .section-header-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--primary);
+}
+
+.locked-header .section-header-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--error);
+}
+
+.section-header-cols {
+  display: flex;
+  gap: 5.5rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+/* Table */
+.nvr-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.nvr-row {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.nvr-row:last-child {
+  border-bottom: none;
+}
+
+.nvr-row:hover {
+  background: var(--bg-card-hover);
+}
+
+.nvr-row-locked {
+  opacity: 0.7;
+}
+
+.nvr-row-locked:hover {
+  opacity: 0.85;
+}
+
+.col-serial {
+  width: 52px;
+  text-align: center;
+  padding: 0.85rem 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.col-title {
+  padding: 0.85rem 0.75rem;
+  font-size: 0.93rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.inline-lock {
+  color: var(--error);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.ws-title-text {
+  font-weight: 500;
+}
+
+.tag-free {
+  background: rgba(0, 184, 122, 0.12);
+  color: var(--success);
+  border: 1px solid rgba(0, 184, 122, 0.25);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tag-topic {
+  background: var(--primary-glow);
+  color: var(--primary);
+  border: 1px solid var(--border-strong);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.tag-diff {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.tag-diff-easy {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.tag-diff-medium {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.tag-diff-hard {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.col-action {
+  padding: 0.65rem 0.75rem;
+  white-space: nowrap;
+  width: 150px;
+}
+
+.row-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.79rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid;
+  transition: all 0.15s;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+.btn-download {
+  background: transparent;
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.btn-download:hover {
+  background: var(--primary-glow);
+}
+
+.btn-quiz {
+  background: var(--primary);
+  color: var(--text-on-primary);
+  border-color: var(--primary);
+}
+
+.btn-quiz:hover {
+  background: var(--primary-light);
+  border-color: var(--primary-light);
+}
+
+.btn-locked {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
+.btn-locked:hover {
+  color: var(--error);
+  border-color: var(--error);
+  background: rgba(232, 54, 78, 0.05);
+}
+
+.row-coming-soon {
+  min-height: 2.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.15;
+}
+
+/* ── Quiz Attempt Group ────────────────────────────────── */
+.quiz-attempt-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+}
+
+.quiz-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.quiz-score-badge .score-check {
+  font-size: 0.65rem;
+}
+
+.btn-view-results {
+  background: transparent;
+  color: #3B82F6;
+  border-color: #3B82F6;
+  font-size: 0.7rem !important;
+  padding: 0.2rem 0.5rem !important;
+  gap: 0.2rem !important;
+  white-space: nowrap;
+}
+
+.btn-view-results:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.btn-reattempt {
+  background: transparent;
+  color: #F59E0B;
+  border-color: #F59E0B;
+  font-size: 0.7rem !important;
+  padding: 0.2rem 0.5rem !important;
+  gap: 0.2rem !important;
+  white-space: nowrap;
+}
+
+.btn-reattempt:hover {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+/* ── Bottom CTA ─────────────────────────────────────────── */
+.nvr-bottom-cta {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  margin-top: 1.5rem;
+  border-radius: var(--radius-lg);
+  flex-wrap: wrap;
+}
+
+.cta-icon-wrap {
+  width: 48px;
+  height: 48px;
+  background: rgba(232, 54, 78, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: var(--error);
+  flex-shrink: 0;
+}
+
+.cta-text {
+  flex: 1;
+  min-width: 180px;
+}
+
+.cta-text h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.cta-text p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* ── Empty State ────────────────────────────────────────── */
+.empty-state {
+  padding: 3rem;
+  text-align: center;
+  border-radius: var(--radius-lg);
+}
+
+.empty-state svg {
+  font-size: 2.5rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.empty-state h3 {
+  font-size: 1.15rem;
+  margin-bottom: 0.4rem;
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .nvr-hero-inner {
+    flex-direction: column;
+  }
+
+  .nvr-price-card {
+    width: 100%;
+  }
+
+  .nvr-stats-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .nvr-title {
+    font-size: 2rem;
+  }
+
+  .section-header-cols {
+    display: none;
+  }
+
+  .col-action {
+    width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .nvr-stats-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .nvr-title {
+    font-size: 1.75rem;
+  }
+
+  .col-serial {
+    display: none;
+  }
+
+  .nvr-bottom-cta {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .cta-icon-wrap {
+    margin: 0 auto;
+  }
+}

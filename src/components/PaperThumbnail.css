@@ -1,0 +1,201 @@
+/* ── Shared Grid styles for papers ─────────────────────────── */
+.paper-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.25rem;
+}
+
+/* ── Card (vertical) ─────────────────────────────────────── */
+.paper-card {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+    cursor: default;
+}
+
+.paper-card:hover {
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Thumbnail ───────────────────────────────────────────── */
+.paper-thumb {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    background: var(--diff-gradient);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* Top bar: logo + brand name */
+.paper-thumb-topbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 8px 3px;
+    background: rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(4px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.paper-thumb-logo {
+    width: 15px;
+    height: 15px;
+    object-fit: contain;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.paper-thumb-brand {
+    font-size: 0.55rem;
+    font-weight: 800;
+    color: var(--diff-color);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Decorative ruled lines */
+.paper-thumb-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 5px 10px 2px;
+}
+
+.thumb-line {
+    display: block;
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.thumb-line.long {
+    width: 80%;
+}
+
+.thumb-line.medium {
+    width: 55%;
+}
+
+/* Centred title area */
+.paper-thumb-center {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+}
+
+.paper-thumb-title {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: rgba(0, 0, 0, 0.75);
+    text-align: center;
+    line-height: 1.3;
+    word-break: break-word;
+    margin: 0;
+}
+
+/* Bottom footer bar */
+.paper-thumb-footer {
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.paper-thumb-diff-badge {
+    font-size: 0.55rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--diff-color);
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--diff-color);
+    padding: 1px 5px;
+    border-radius: 999px;
+}
+
+/* Corner fold */
+.paper-thumb-fold {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 0 16px 16px;
+    border-color: transparent transparent rgba(255, 255, 255, 0.55) transparent;
+}
+
+/* ── Card info (shared card metadata layout) ─────────────── */
+.paper-card-info {
+    padding: 0.75rem 0.9rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.paper-card-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.4;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.paper-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.paper-meta-badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text-secondary);
+}
+
+.paper-year-badge {
+    color: var(--primary);
+    border-color: rgba(var(--primary-rgb, 79, 70, 229), 0.25);
+    background: rgba(var(--primary-rgb, 79, 70, 229), 0.08);
+}
+
+.paper-diff-badge {
+    font-weight: 700;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .paper-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .paper-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .paper-grid {
+        grid-template-columns: 1fr;
+    }
+}

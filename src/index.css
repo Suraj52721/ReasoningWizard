@@ -206,7 +206,8 @@ textarea {
 
 .page-container {
   min-height: 100vh;
-  padding-top: 80px;
+  padding: 80px 1.5rem 4rem;
+  width: 100%;
 }
 
 /* Floating particles */

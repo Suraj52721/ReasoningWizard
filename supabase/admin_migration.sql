@@ -9,6 +9,19 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
 -- 2. Add negative marking columns to quizzes
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS negative_marking BOOLEAN DEFAULT false;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS negative_marks NUMERIC(3,2) DEFAULT 0.25;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS quiz_mode TEXT DEFAULT 'dashboard';
+
+UPDATE quizzes
+SET quiz_mode = 'premium'
+WHERE id IN (
+  SELECT quiz_id FROM premium_nvr_worksheets WHERE quiz_id IS NOT NULL
+  UNION
+  SELECT quiz_id FROM premium_test_papers WHERE quiz_id IS NOT NULL
+);
+
+UPDATE quizzes
+SET quiz_mode = 'dashboard'
+WHERE quiz_mode IS NULL;
 
 -- 3. Add optional image_url to questions
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT '';

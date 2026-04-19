@@ -14,3 +14,28 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Razorpay Production Setup
+
+This project already routes payment creation and signature verification through Supabase Edge Functions.
+
+1. Frontend key id:
+Add your Razorpay key id in `.env.local` as `VITE_RAZORPAY_KEY_ID`.
+
+2. Edge Function secrets (server-side only):
+Set these in Supabase project secrets:
+- `RAZORPAY_KEY_ID`
+- `RAZORPAY_KEY_SECRET`
+
+3. Deploy/redeploy functions after setting secrets:
+
+```bash
+supabase functions deploy create-razorpay-order
+supabase functions deploy verify-razorpay-payment
+```
+
+4. Ensure frontend env vars are present for edge calls:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Security note: never store `RAZORPAY_KEY_SECRET` in frontend files.

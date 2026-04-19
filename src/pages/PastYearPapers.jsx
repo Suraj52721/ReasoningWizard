@@ -1,63 +1,65 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 import { FiDownload, FiFileText, FiFilter, FiSearch, FiChevronDown } from 'react-icons/fi';
 import SEO from '../components/SEO';
 import logo from '../assets/logo.png';
+import PaperThumbnail, { DIFFICULTY_CONFIG } from '../components/PaperThumbnail';
 import './PastYearPapers.css';
 
-const SUBJECTS = ['All', '11+ Mathematics', 'Science', 'English', 'History', 'Geography', 'General Knowledge', 'Reasoning', 'Verbal Reasoning', 'Non-Verbal Reasoning'];
-
+const SUBJECTS = ['All', '11+ Mathematics', 'English'];
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
-
-const DIFFICULTY_CONFIG = {
-    Easy:   { color: '#22c55e', bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.25)',   gradient: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' },
-    Medium: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.25)',  gradient: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' },
-    Hard:   { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.25)',   gradient: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' },
-};
 
 const fadeUp = {
     hidden: { opacity: 0, y: 20 },
     visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.06, duration: 0.4 } })
 };
 
-function PaperThumbnail({ title, difficulty }) {
-    const cfg = DIFFICULTY_CONFIG[difficulty];
+
+function LoginPopup({ onClose }) {
     return (
-        <div className="pyp-thumb" style={{ '--diff-color': cfg.color, '--diff-bg': cfg.bg, '--diff-gradient': cfg.gradient }}>
-            {/* Top bar with logo */}
-            <div className="pyp-thumb-topbar">
-                <img src={logo} alt="ReasoningWizard" className="pyp-thumb-logo" />
-                <span className="pyp-thumb-brand">ReasoningWizard</span>
-            </div>
-            {/* Decorative lines mimicking text */}
-            <div className="pyp-thumb-lines">
-                <span className="thumb-line long" />
-                <span className="thumb-line medium" />
-            </div>
-            {/* Paper title centred */}
-            <div className="pyp-thumb-center">
-                <p className="pyp-thumb-title">{title}</p>
-            </div>
-            {/* Bottom accent */}
-            <div className="pyp-thumb-footer">
-                <span className="pyp-thumb-diff-badge">{difficulty}</span>
-            </div>
-            {/* Subtle corner fold */}
-            <span className="pyp-thumb-fold" />
-        </div>
+        <motion.div
+            className="pyp-login-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+        >
+            <motion.div
+                className="pyp-login-modal glass-card"
+                initial={{ opacity: 0, scale: 0.92, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: 16 }}
+                onClick={e => e.stopPropagation()}
+            >
+                <h3>Sign in to access papers</h3>
+                <p>Please sign in or create an account to download past papers.</p>
+                <div className="pyp-login-actions">
+                    <Link to="/login" onClick={onClose}>
+                        <button className="btn-primary">Sign In</button>
+                    </Link>
+                    <Link to="/register" onClick={onClose}>
+                        <button className="btn-secondary">Create Account</button>
+                    </Link>
+                </div>
+            </motion.div>
+        </motion.div>
     );
 }
 
 export default function PastYearPapers() {
+    const { user } = useAuth();
     const [papers, setPapers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [selectedSubject, setSelectedSubject] = useState('All');
+    const [showLoginPopup, setShowLoginPopup] = useState(false);
 
-    const easyRef   = useRef(null);
+    const easyRef = useRef(null);
     const mediumRef = useRef(null);
-    const hardRef   = useRef(null);
+    const hardRef = useRef(null);
     const sectionRefs = { Easy: easyRef, Medium: mediumRef, Hard: hardRef };
 
     useEffect(() => {
@@ -79,9 +81,19 @@ export default function PastYearPapers() {
         sectionRefs[difficulty]?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    function handlePaperAccess(e, paperId) {
+        if (user) {
+            supabase.from('download_logs').insert({ resource_type: 'past_paper', resource_id: paperId });
+            return;
+        }
+
+        e.preventDefault();
+        setShowLoginPopup(true);
+    }
+
     const filtered = papers.filter(p => {
         const matchesSubject = selectedSubject === 'All' || p.subject === selectedSubject;
-        const matchesSearch  = !search || p.title.toLowerCase().includes(search.toLowerCase()) || String(p.year || '').includes(search);
+        const matchesSearch = !search || p.title.toLowerCase().includes(search.toLowerCase()) || String(p.year || '').includes(search);
         return matchesSubject && matchesSearch;
     });
 
@@ -95,10 +107,14 @@ export default function PastYearPapers() {
     return (
         <>
             <SEO
-                title="11+ MathsPast Papers | ReasoningWizard"
-                description="Download free 11+ Maths past year papers for 11+ exam preparation. Browse Easy, Medium, and Hard difficulty papers by subject."
+                title="11+ Past Year Papers | ReasoningWizard"
+                description="Download free 11+ past year papers for exam preparation. Browse Easy, Medium, and Hard difficulty papers by subject."
             />
             <div className="pyp-page page-container">
+                <AnimatePresence>
+                    {showLoginPopup && <LoginPopup onClose={() => setShowLoginPopup(false)} />}
+                </AnimatePresence>
+
                 {/* Hero */}
                 <motion.div
                     className="pyp-hero"
@@ -106,7 +122,7 @@ export default function PastYearPapers() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
                 >
-                    <h1 className="pyp-title">Past Year <span className="text-gradient">Papers</span></h1>
+                    <h1 className="pyp-title">11+ Past Year <span className="text-gradient">Papers</span></h1>
                     <p className="pyp-subtitle">
                         Practise with real exam papers. Choose your difficulty and download instantly.
                     </p>
@@ -201,29 +217,30 @@ export default function PastYearPapers() {
                                     </div>
 
                                     {/* Cards grid */}
-                                    <div className="pyp-grid">
+                                    <div className="paper-grid">
                                         <AnimatePresence>
                                             {list.map((paper, i) => (
                                                 <motion.div
                                                     key={paper.id}
-                                                    className="pyp-card glass-card"
+                                                    className="paper-card glass-card"
                                                     custom={i}
                                                     variants={fadeUp}
                                                     initial="hidden"
                                                     animate="visible"
                                                     whileHover={{ y: -6, transition: { duration: 0.2 } }}
+                                                    onClick={() => { if (!user) setShowLoginPopup(true); }}
                                                 >
                                                     {/* Thumbnail */}
                                                     <PaperThumbnail title={paper.title} difficulty={difficulty} />
 
                                                     {/* Info below thumbnail */}
-                                                    <div className="pyp-card-info">
-                                                        <p className="pyp-card-title">{paper.title}</p>
-                                                        <div className="pyp-card-meta">
-                                                            <span className="meta-badge subject-badge">{paper.subject}</span>
-                                                            {paper.year && <span className="meta-badge year-badge">{paper.year}</span>}
+                                                    <div className="paper-card-info">
+                                                        <p className="paper-card-title">{paper.title}</p>
+                                                        <div className="paper-card-meta">
+                                                            <span className="paper-meta-badge subject-badge">{paper.subject}</span>
+                                                            {paper.year && <span className="paper-meta-badge paper-year-badge">{paper.year}</span>}
                                                             <span
-                                                                className="meta-badge diff-badge"
+                                                                className="paper-meta-badge paper-diff-badge"
                                                                 style={{ background: cfg.bg, color: cfg.color, borderColor: cfg.border }}
                                                             >
                                                                 {difficulty}
@@ -238,7 +255,7 @@ export default function PastYearPapers() {
                                                         download
                                                         className="pyp-download-btn"
                                                         style={{ '--diff-color': cfg.color }}
-                                                        onClick={() => supabase.from('download_logs').insert({ resource_type: 'past_paper', resource_id: paper.id })}
+                                                        onClick={(e) => handlePaperAccess(e, paper.id)}
                                                     >
                                                         <FiDownload /> Download
                                                     </a>

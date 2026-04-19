@@ -21,6 +21,9 @@ import Quiz from './pages/Quiz';
 import QuizSolutions from './pages/QuizSolutions';
 import Admin from './pages/Admin';
 import PastYearPapers from './pages/PastYearPapers';
+import NVRWorksheets from './pages/NVRWorksheets';
+import TestPapers from './pages/TestPapers';
+import PremiumQuizGate from './pages/PremiumQuizGate';
 
 function App() {
   return (
@@ -42,6 +45,11 @@ function App() {
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/questions" element={<Questions />} />
               <Route path="/past-papers" element={<PastYearPapers />} />
+              <Route path="/nvr-worksheets" element={<NVRWorksheets />} />
+              <Route path="/test-papers" element={<TestPapers />} />
+              <Route path="/premium-quiz/:id" element={
+                <PremiumQuizGate />
+              } />
               <Route path="/question/:questionId" element={<QuestionDetail />} />
 <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/quiz/:id" element={

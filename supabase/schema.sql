@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
   subject TEXT NOT NULL DEFAULT 'General',
   quiz_date DATE NOT NULL DEFAULT CURRENT_DATE,
   duration_minutes INT NOT NULL DEFAULT 10,
+  quiz_mode TEXT NOT NULL DEFAULT 'dashboard' CHECK (quiz_mode IN ('dashboard', 'premium')),
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
