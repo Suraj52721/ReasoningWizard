@@ -1,0 +1,100 @@
+.tp-promo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: rgba(2, 8, 20, 0.52);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.tp-promo-card {
+  position: relative;
+  width: min(500px, 100%);
+  padding: 2rem 1.5rem;
+  border: 1px solid rgba(245, 197, 24, 0.25);
+  background:
+    radial-gradient(circle at 12% -30%, rgba(245, 197, 24, 0.22), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.12), transparent 55%),
+    var(--bg-card);
+}
+
+.tp-promo-thumb-wrap {
+  width: min(240px, 100%);
+  margin: 0 auto 0.9rem;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(245, 197, 24, 0.2);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.22);
+}
+
+.tp-promo-thumb-wrap .paper-thumb {
+  aspect-ratio: 4 / 3;
+}
+
+.tp-promo-close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tp-promo-close:hover {
+  color: var(--text-primary);
+}
+
+.tp-promo-chip {
+  display: inline-flex;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--primary);
+  background: rgba(245, 197, 24, 0.14);
+  border: 1px solid rgba(245, 197, 24, 0.25);
+}
+
+.tp-promo-card h3 {
+  margin-top: 0.9rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.tp-promo-card p {
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.tp-promo-actions {
+  margin-top: 1rem;
+}
+
+.tp-promo-actions a {
+  text-decoration: none;
+}
+
+.tp-promo-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 520px) {
+  .tp-promo-thumb-wrap {
+    width: min(220px, 100%);
+  }
+}

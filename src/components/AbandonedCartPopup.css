@@ -1,0 +1,78 @@
+.cart-reminder-shell {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1500;
+  width: min(360px, calc(100vw - 2rem));
+}
+
+.cart-reminder-card {
+  position: relative;
+  border: 1px solid rgba(245, 197, 24, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(245, 197, 24, 0.18), transparent 45%),
+    var(--bg-card);
+  padding: 1rem 1rem 0.95rem;
+}
+
+.cart-reminder-close {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.cart-reminder-close:hover {
+  color: var(--text-primary);
+}
+
+.cart-reminder-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 197, 24, 0.16);
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.cart-reminder-copy h4 {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0 0 0.2rem;
+}
+
+.cart-reminder-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.cart-reminder-link {
+  text-decoration: none;
+}
+
+.cart-reminder-btn {
+  margin-top: 0.75rem;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .cart-reminder-shell {
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    bottom: 0.75rem;
+  }
+}

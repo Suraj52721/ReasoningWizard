@@ -399,16 +399,64 @@ export default function Admin() {
     async function fetchStudents() {
         setLoadingStudents(true);
         try {
-            // Get all non-admin profiles
-            const { data: profiles } = await supabase
+            // Get all profiles, including email when available in schema.
+            let profiles = [];
+            const profilesWithEmail = await supabase
                 .from('profiles')
-                .select('id, display_name, is_admin')
+                .select('id, display_name, is_admin, email')
                 .order('display_name');
+
+            if (profilesWithEmail.error) {
+                const profilesFallback = await supabase
+                    .from('profiles')
+                    .select('id, display_name, is_admin')
+                    .order('display_name');
+                profiles = profilesFallback.data || [];
+            } else {
+                profiles = profilesWithEmail.data || [];
+            }
 
             // Get quiz attempts grouped by user
             const { data: attempts } = await supabase
                 .from('quiz_attempts')
                 .select('user_id, score, total_questions');
+
+            // Fetch missing emails from a secure admin edge function backed by auth.admin API.
+            const studentIdsWithoutEmail = profiles
+                .filter(p => !p.is_admin && !(p.email || '').trim())
+                .map(p => p.id);
+            const emailByUser = {};
+
+            if (studentIdsWithoutEmail.length > 0) {
+                const { data: emailFnData, error: emailFnError } = await supabase.functions.invoke('admin-student-emails', {
+                    body: { user_ids: studentIdsWithoutEmail },
+                });
+
+                if (!emailFnError && Array.isArray(emailFnData?.emails)) {
+                    emailFnData.emails.forEach((row) => {
+                        if (row?.id && row?.email) {
+                            emailByUser[row.id] = row.email;
+                        }
+                    });
+                }
+
+                // Secondary fallback: latest email captured in visitor logs.
+                const stillMissing = studentIdsWithoutEmail.filter((id) => !emailByUser[id]);
+                if (stillMissing.length > 0) {
+                    const { data: visitorRows } = await supabase
+                        .from('site_visitors')
+                        .select('user_id, user_email, visited_at')
+                        .in('user_id', stillMissing)
+                        .neq('user_email', '')
+                        .order('visited_at', { ascending: false });
+
+                    (visitorRows || []).forEach(v => {
+                        if (!emailByUser[v.user_id] && v.user_email) {
+                            emailByUser[v.user_id] = v.user_email;
+                        }
+                    });
+                }
+            }
 
             const attemptsByUser = {};
             (attempts || []).forEach(a => {
@@ -431,6 +479,7 @@ export default function Admin() {
                     return {
                         id: p.id,
                         name: p.display_name || 'Anonymous',
+                        email: (p.email || emailByUser[p.id] || '').trim(),
                         totalQuizzes,
                         avgPercent: Math.round(avgPercent * 10) / 10,
                     };
@@ -1256,6 +1305,25 @@ export default function Admin() {
     const pagedVisitors = filteredVisitors.slice(visitorPage * VISITORS_PER_PAGE, (visitorPage + 1) * VISITORS_PER_PAGE);
     const totalVisitorPages = Math.ceil(filteredVisitors.length / VISITORS_PER_PAGE);
 
+    const filteredStudents = useMemo(() => {
+        const q = studentSearch.trim().toLowerCase();
+        const list = students.filter(s => {
+            if (!q) return true;
+            return (s.name || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q);
+        });
+
+        list.sort((a, b) => {
+            let cmp = 0;
+            if (studentSortField === 'name') cmp = (a.name || '').localeCompare(b.name || '');
+            else if (studentSortField === 'email') cmp = (a.email || '').localeCompare(b.email || '');
+            else if (studentSortField === 'totalQuizzes') cmp = (a.totalQuizzes || 0) - (b.totalQuizzes || 0);
+            else if (studentSortField === 'avgPercent') cmp = (a.avgPercent || 0) - (b.avgPercent || 0);
+            return studentSortDir === 'asc' ? cmp : -cmp;
+        });
+
+        return list;
+    }, [students, studentSearch, studentSortField, studentSortDir]);
+
     function toggleVisitorSort(field) {
         setVisitorSort(prev => ({
             field,
@@ -2049,7 +2117,7 @@ Exp: 5 times 5 equals 25.`}
                                         <div className="section-header">
                                             <div>
                                                 <h2><FiUserCheck /> Student Details</h2>
-                                                <p className="subtitle">View student quiz performance — name, quizzes attempted, and average score.</p>
+                                                <p className="subtitle">View student quiz performance — name, email, quizzes attempted, and average score.</p>
                                             </div>
                                             <div className="section-header-pill">{students.length} students</div>
                                         </div>
@@ -2078,7 +2146,7 @@ Exp: 5 times 5 equals 25.`}
                                             <FiSearch />
                                             <input
                                                 type="text"
-                                                placeholder="Search by name…"
+                                                placeholder="Search by name or email…"
                                                 value={studentSearch}
                                                 onChange={e => setStudentSearch(e.target.value)}
                                             />
@@ -2095,6 +2163,9 @@ Exp: 5 times 5 equals 25.`}
                                                             <th className="admin-sortable-th" onClick={() => { setStudentSortField('name'); setStudentSortDir(prev => studentSortField === 'name' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'); }}>
                                                                 Name {studentSortField === 'name' && (studentSortDir === 'asc' ? <FiArrowUp className="sort-arrow" /> : <FiArrowDown className="sort-arrow" />)}
                                                             </th>
+                                                            <th className="admin-sortable-th" onClick={() => { setStudentSortField('email'); setStudentSortDir(prev => studentSortField === 'email' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'); }}>
+                                                                Email {studentSortField === 'email' && (studentSortDir === 'asc' ? <FiArrowUp className="sort-arrow" /> : <FiArrowDown className="sort-arrow" />)}
+                                                            </th>
                                                             <th className="admin-sortable-th" onClick={() => { setStudentSortField('totalQuizzes'); setStudentSortDir(prev => studentSortField === 'totalQuizzes' ? (prev === 'asc' ? 'desc' : 'asc') : 'desc'); }}>
                                                                 Total Quizzes {studentSortField === 'totalQuizzes' && (studentSortDir === 'asc' ? <FiArrowUp className="sort-arrow" /> : <FiArrowDown className="sort-arrow" />)}
                                                             </th>
@@ -2104,19 +2175,12 @@ Exp: 5 times 5 equals 25.`}
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {students
-                                                            .filter(s => !studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase()))
-                                                            .sort((a, b) => {
-                                                                let cmp = 0;
-                                                                if (studentSortField === 'name') cmp = a.name.localeCompare(b.name);
-                                                                else if (studentSortField === 'totalQuizzes') cmp = a.totalQuizzes - b.totalQuizzes;
-                                                                else if (studentSortField === 'avgPercent') cmp = a.avgPercent - b.avgPercent;
-                                                                return studentSortDir === 'asc' ? cmp : -cmp;
-                                                            })
+                                                        {filteredStudents
                                                             .map((s, i) => (
                                                                 <tr key={s.id}>
                                                                     <td>{i + 1}</td>
                                                                     <td style={{ fontWeight: 600 }}>{s.name}</td>
+                                                                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{s.email || '—'}</td>
                                                                     <td><span className="admin-quiz-count">{s.totalQuizzes}</span></td>
                                                                     <td>
                                                                         <span className={`status-badge ${s.avgPercent >= 70 ? 'status-active' : s.avgPercent >= 40 ? 'status-pending' : 'status-expired'}`}>
@@ -2125,9 +2189,9 @@ Exp: 5 times 5 equals 25.`}
                                                                     </td>
                                                                 </tr>
                                                             ))}
-                                                        {students.filter(s => !studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase())).length === 0 && (
+                                                        {filteredStudents.length === 0 && (
                                                             <tr>
-                                                                <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No students found.</td>
+                                                                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No students found.</td>
                                                             </tr>
                                                         )}
                                                     </tbody>

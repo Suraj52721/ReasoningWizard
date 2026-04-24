@@ -37,6 +37,7 @@ export default function Quiz() {
     const [topperScore, setTopperScore] = useState(0);
     const [showSolutions, setShowSolutions] = useState(false);
     const [expandedSolutions, setExpandedSolutions] = useState({});
+    const [showSubmitOfferPopup, setShowSubmitOfferPopup] = useState(false);
     const timerRef = useRef(null);
     const [sessionId, setSessionId] = useState(null);
     const [isResuming, setIsResuming] = useState(false);
@@ -145,6 +146,7 @@ export default function Quiz() {
                 timeTaken: attemptData.time_taken_seconds,
                 answers: attemptData.answers || [],
             });
+            setShowSubmitOfferPopup(false);
             setPhase('submitted');
             fetchLeaderboard({ score: attemptData.score, timeTaken: attemptData.time_taken_seconds });
         } else {
@@ -312,6 +314,7 @@ export default function Quiz() {
             answers: answerDetails,
         });
         setPhase('submitted');
+        setShowSubmitOfferPopup(true);
         fetchLeaderboard({ score: Math.round(score), timeTaken: totalTime });
 
         // Exit fullscreen on submit
@@ -529,6 +532,46 @@ export default function Quiz() {
             <div className="quiz-page page-container">
                 <SEO title={`Results: ${quiz?.title} `} />
                 <div className="quiz-inner result-page">
+                    <AnimatePresence>
+                        {showSubmitOfferPopup && (
+                            <motion.div
+                                className="submit-offer-overlay"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                            >
+                                <motion.div
+                                    className="submit-offer-card glass-card"
+                                    initial={{ opacity: 0, y: 25, scale: 0.92 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 20, scale: 0.92 }}
+                                    transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                                >
+                                    <h3>Quiz submitted successfully</h3>
+                                    <p>Your answers are saved. You can view your result now or continue preparing with premium test papers.</p>
+                                    <div className="submit-offer-actions">
+                                        <motion.button
+                                            className="btn-secondary submit-offer-btn"
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={() => setShowSubmitOfferPopup(false)}
+                                        >
+                                            View Result
+                                        </motion.button>
+                                        <motion.button
+                                            className="btn-primary submit-offer-btn"
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={() => navigate('/test-papers')}
+                                        >
+                                            Buy Test Papers
+                                        </motion.button>
+                                    </div>
+                                </motion.div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     {/* Confetti */}
                     {percentage >= 70 && (
                         <div className="confetti-container">

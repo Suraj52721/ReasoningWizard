@@ -2,7 +2,10 @@ import { supabase } from './supabaseClient';
 
 const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
 // ── Startup validation ─────────────────────────────────────────────
 if (!RAZORPAY_KEY_ID || RAZORPAY_KEY_ID.includes('XXXX')) {

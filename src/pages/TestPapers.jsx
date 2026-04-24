@@ -22,6 +22,7 @@ import PaperThumbnail from '../components/PaperThumbnail';
 import './TestPapers.css';
 
 const SUBJECTS = ['11+ Maths', '11+ NVR', '11+ English'];
+const CART_STORAGE_KEY = 'rw_test_papers_cart';
 
 const DEFAULT_CURRENCY = 'GBP';
 
@@ -45,7 +46,16 @@ export default function TestPapers() {
   const [quizAttempts, setQuizAttempts] = useState({});  // quiz_id -> { score, total_questions }
 
   // Cart state
-  const [cart, setCart] = useState(new Set());
+  const [cart, setCart] = useState(() => {
+    try {
+      const raw = localStorage.getItem(CART_STORAGE_KEY);
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? new Set(parsed) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [cartOpen, setCartOpen] = useState(false);
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discount_type, discount_value }
@@ -63,6 +73,10 @@ export default function TestPapers() {
   useEffect(() => {
     fetchAll();
   }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(Array.from(cart)));
+  }, [cart]);
 
   // Auto-dismiss payment errors after 8 seconds
   useEffect(() => {

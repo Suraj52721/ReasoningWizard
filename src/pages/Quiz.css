@@ -737,6 +737,55 @@
     border-radius: 2px;
 }
 
+/* Post-submit test paper offer */
+.submit-offer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.submit-offer-card {
+    width: min(500px, 100%);
+    padding: 1.8rem 1.5rem;
+    text-align: center;
+    border: 1px solid rgba(245, 197, 24, 0.28);
+    background:
+        radial-gradient(circle at top right, rgba(245, 197, 24, 0.18), transparent 50%),
+        var(--bg-card);
+}
+
+.submit-offer-card h3 {
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+}
+
+.submit-offer-card p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    margin-bottom: 1.1rem;
+}
+
+.submit-offer-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.submit-offer-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 @media (max-width: 600px) {
     .quiz-page {
         padding-top: 70px;
@@ -808,6 +857,10 @@
     .quiz-nav button {
         width: 100%;
         justify-content: center;
+    }
+
+    .submit-offer-actions {
+        flex-direction: column;
     }
 }
 
