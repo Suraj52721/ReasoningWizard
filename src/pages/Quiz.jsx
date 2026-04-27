@@ -37,7 +37,6 @@ export default function Quiz() {
     const [topperScore, setTopperScore] = useState(0);
     const [showSolutions, setShowSolutions] = useState(false);
     const [expandedSolutions, setExpandedSolutions] = useState({});
-    const [showSubmitOfferPopup, setShowSubmitOfferPopup] = useState(false);
     const timerRef = useRef(null);
     const [sessionId, setSessionId] = useState(null);
     const [isResuming, setIsResuming] = useState(false);
@@ -146,7 +145,6 @@ export default function Quiz() {
                 timeTaken: attemptData.time_taken_seconds,
                 answers: attemptData.answers || [],
             });
-            setShowSubmitOfferPopup(false);
             setPhase('submitted');
             fetchLeaderboard({ score: attemptData.score, timeTaken: attemptData.time_taken_seconds });
         } else {
@@ -203,7 +201,7 @@ export default function Quiz() {
 
         // Stats: Topper & Average
         if (lbData.length > 0) {
-            setTopperScore(lbData[0].score);
+            setTopperScore(Number(lbData[0].score) || 0);
         }
 
         // Fetch all scores for average calculation (optimization: could be an RPC or separate query)
@@ -214,7 +212,7 @@ export default function Quiz() {
 
         if (allScores?.length) {
             setTotalParticipants(allScores.length);
-            const totalScore = allScores.reduce((sum, item) => sum + item.score, 0);
+            const totalScore = allScores.reduce((sum, item) => sum + (Number(item.score) || 0), 0);
             setAverageScore(Math.round((totalScore / allScores.length) * 10) / 10);
         }
 
@@ -314,7 +312,6 @@ export default function Quiz() {
             answers: answerDetails,
         });
         setPhase('submitted');
-        setShowSubmitOfferPopup(true);
         fetchLeaderboard({ score: Math.round(score), timeTaken: totalTime });
 
         // Exit fullscreen on submit
@@ -468,6 +465,16 @@ export default function Quiz() {
         : null;
     const totalTimeSecs = quiz?.duration_minutes * 60 || 600;
     const timeUsedPct = result ? Math.min(100, Math.round((result.timeTaken / totalTimeSecs) * 100)) : 0;
+    const comparisonData = [
+        { name: 'You', score: Number(result?.score) || 0, color: '#8B5CF6' },
+        { name: 'Average', score: Number(averageScore) || 0, color: '#3B82F6' },
+        { name: 'Topper', score: Number(topperScore) || 0, color: '#F59E0B' },
+    ];
+    const comparisonMax = Math.max(
+        Number(result?.total) || 0,
+        ...comparisonData.map((d) => d.score),
+        1
+    );
 
     // Donut chart helper
     const DonutSegment = ({ startAngle, endAngle, color, radius = 45, cx = 50, cy = 50 }) => {
@@ -532,46 +539,6 @@ export default function Quiz() {
             <div className="quiz-page page-container">
                 <SEO title={`Results: ${quiz?.title} `} />
                 <div className="quiz-inner result-page">
-                    <AnimatePresence>
-                        {showSubmitOfferPopup && (
-                            <motion.div
-                                className="submit-offer-overlay"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                            >
-                                <motion.div
-                                    className="submit-offer-card glass-card"
-                                    initial={{ opacity: 0, y: 25, scale: 0.92 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 20, scale: 0.92 }}
-                                    transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                                >
-                                    <h3>Quiz submitted successfully</h3>
-                                    <p>Your answers are saved. You can view your result now or continue preparing with premium test papers.</p>
-                                    <div className="submit-offer-actions">
-                                        <motion.button
-                                            className="btn-secondary submit-offer-btn"
-                                            whileHover={{ scale: 1.02 }}
-                                            whileTap={{ scale: 0.98 }}
-                                            onClick={() => setShowSubmitOfferPopup(false)}
-                                        >
-                                            View Result
-                                        </motion.button>
-                                        <motion.button
-                                            className="btn-primary submit-offer-btn"
-                                            whileHover={{ scale: 1.02 }}
-                                            whileTap={{ scale: 0.98 }}
-                                            onClick={() => navigate('/test-papers')}
-                                        >
-                                            Buy Test Papers
-                                        </motion.button>
-                                    </div>
-                                </motion.div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
                     {/* Confetti */}
                     {percentage >= 70 && (
                         <div className="confetti-container">
@@ -679,11 +646,7 @@ export default function Quiz() {
                         <div className="chart-container" style={{ width: '100%', height: 300 }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
-                                    data={[
-                                        { name: 'You', score: result.score, color: '#8B5CF6' },
-                                        { name: 'Average', score: averageScore, color: '#3B82F6' },
-                                        { name: 'Topper', score: topperScore, color: '#F59E0B' }
-                                    ]}
+                                    data={comparisonData}
                                     margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
                                 >
                                     <XAxis
@@ -695,14 +658,14 @@ export default function Quiz() {
                                     />
                                     <YAxis
                                         hide
-                                        domain={[0, result.total || 'auto']}
+                                        domain={[0, comparisonMax]}
                                     />
                                     <Tooltip
                                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                         contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', borderRadius: '8px', color: '#F3F4F6' }}
                                         itemStyle={{ color: '#F3F4F6' }}
                                     />
-                                    <Bar dataKey="score" radius={[8, 8, 0, 0]} animationDuration={1500}>
+                                    <Bar dataKey="score" radius={[8, 8, 0, 0]} animationDuration={1500} minPointSize={4}>
                                         <Cell fill="#8B5CF6" />
                                         <Cell fill="#3B82F6" />
                                         <Cell fill="#F59E0B" />

@@ -98,13 +98,28 @@ export default function Dashboard() {
 
     async function fetchQuizzes() {
         setLoadingQuizzes(true);
-        const { data: quizzesData } = await supabase
-            .from('quizzes')
-            .select('*')
-            .neq('is_draft', true)
-            .order('quiz_date', { ascending: false });
+        const [
+            { data: quizzesData },
+            { data: premiumNvrLinks },
+            { data: premiumPaperLinks },
+        ] = await Promise.all([
+            supabase
+                .from('quizzes')
+                .select('*')
+                .neq('is_draft', true)
+                .order('quiz_date', { ascending: false }),
+            supabase.from('premium_nvr_worksheets').select('quiz_id').not('quiz_id', 'is', null),
+            supabase.from('premium_test_papers').select('quiz_id').not('quiz_id', 'is', null),
+        ]);
 
-        const dashboardOnlyQuizzes = (quizzesData || []).filter(q => q.quiz_mode !== 'premium');
+        const premiumQuizIds = new Set([
+            ...(premiumNvrLinks || []).map(row => row.quiz_id),
+            ...(premiumPaperLinks || []).map(row => row.quiz_id),
+        ]);
+
+        const dashboardOnlyQuizzes = (quizzesData || []).filter(
+            q => q.quiz_mode !== 'premium' && !premiumQuizIds.has(q.id)
+        );
 
         let attemptsData = [], sessionsData = [];
         if (user) {

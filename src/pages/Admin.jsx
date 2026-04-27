@@ -19,9 +19,10 @@ const fadeUp = {
 
 const SUBJECTS = ['11+ Mathematics', 'Science', 'English', 'History', 'Geography', 'General Knowledge', 'Reasoning', 'Verbal Reasoning', 'Non-Verbal Reasoning'];
 
-function parseBulkQuestions(text) {
+function parseBulkQuestions(text, includeOptionE = false) {
     const blocks = text.trim().split(/\n\s*\n/);
     const parsed = [];
+    const optionPattern = includeOptionE ? /^[A-E][:.)]\s*/i : /^[A-D][:.)]\s*/i;
     for (const block of blocks) {
         const lines = block.trim().split('\n').map(l => l.trim()).filter(Boolean);
         if (lines.length < 3) continue;
@@ -38,8 +39,8 @@ function parseBulkQuestions(text) {
             if (/^Q[:.)]\s*/i.test(line)) {
                 questionText = line.replace(/^Q[:.)]\s*/i, '').trim();
                 capturingSolution = false;
-            } else if (/^[A-D][:.)]\s*/i.test(line)) {
-                let optText = line.replace(/^[A-D][:.)]\s*/i, '').trim();
+            } else if (optionPattern.test(line)) {
+                let optText = line.replace(optionPattern, '').trim();
                 const isCorrect = optText.endsWith('*');
                 if (isCorrect) {
                     optText = optText.slice(0, -1).trim();
@@ -173,6 +174,8 @@ export default function Admin() {
     const dashboardQuizzes = useMemo(() => quizzes.filter(q => resolveQuizScope(q) === 'dashboard'), [quizzes, premiumQuizIds]);
     const premiumQuizzes = useMemo(() => quizzes.filter(q => resolveQuizScope(q) === 'premium'), [quizzes, premiumQuizIds]);
     const filteredQuizzes = adminMode === 'premium' ? premiumQuizzes : dashboardQuizzes;
+    const isPremiumQuizScope = quizScope === 'premium';
+    const optionCount = isPremiumQuizScope ? 5 : 4;
 
     // For NVR/TP selectors: only show premium quizzes
     const premiumQuizChoices = useMemo(() => (
@@ -705,9 +708,18 @@ export default function Admin() {
                 uploaded_by: (await supabase.auth.getUser()).data.user?.id,
             });
             if (insertError) throw insertError;
+
+            if (nvrQuizId.trim()) {
+                await supabase
+                    .from('quizzes')
+                    .update({ quiz_mode: 'premium' })
+                    .eq('id', nvrQuizId.trim());
+            }
+
             setMessage({ type: 'success', text: 'Premium NVR worksheet added successfully!' });
             setNvrTitle(''); setNvrTopic(''); setNvrFile(null); setNvrQuizId(''); setNvrIsFree(false); setNvrSortOrder(0);
             fetchPremiumNVR();
+            fetchQuizzes();
         } catch (err) {
             setMessage({ type: 'error', text: `Failed: ${err.message}` });
         }
@@ -789,9 +801,18 @@ export default function Admin() {
                 uploaded_by: (await supabase.auth.getUser()).data.user?.id,
             });
             if (insertError) throw insertError;
+
+            if (tpQuizId.trim()) {
+                await supabase
+                    .from('quizzes')
+                    .update({ quiz_mode: 'premium' })
+                    .eq('id', tpQuizId.trim());
+            }
+
             setMessage({ type: 'success', text: 'Premium test paper added successfully!' });
             setTpTitle(''); setTpSchool(''); setTpYear(''); setTpFile(null); setTpQuizId(''); setTpIsFree(false); setTpSortOrder(0);
             fetchPremiumTestPapers();
+            fetchQuizzes();
         } catch (err) {
             setMessage({ type: 'error', text: `Failed: ${err.message}` });
         }
@@ -800,10 +821,37 @@ export default function Admin() {
 
     async function deletePremiumTestPaper(paper) {
         if (!window.confirm(`Delete "${paper.title}"? This cannot be undone.`)) return;
-        if (paper.file_path) await supabase.storage.from('premium_test_papers').remove([paper.file_path]);
-        await supabase.from('premium_test_papers').delete().eq('id', paper.id);
-        setPremiumTestPapers(prev => prev.filter(p => p.id !== paper.id));
-        setMessage({ type: 'success', text: 'Paper deleted.' });
+        try {
+            // Remove dependent purchases first to avoid FK block on premium_test_papers delete.
+            const { error: purchasesDeleteError } = await supabase
+                .from('paper_purchases')
+                .delete()
+                .eq('paper_id', paper.id);
+
+            if (purchasesDeleteError) throw purchasesDeleteError;
+
+            const { error: paperDeleteError } = await supabase
+                .from('premium_test_papers')
+                .delete()
+                .eq('id', paper.id);
+
+            if (paperDeleteError) throw paperDeleteError;
+
+            // Best-effort storage cleanup after DB row is removed.
+            if (paper.file_path) {
+                const { error: storageDeleteError } = await supabase.storage
+                    .from('premium_test_papers')
+                    .remove([paper.file_path]);
+                if (storageDeleteError) {
+                    console.warn('Deleted DB row but failed to remove file from storage:', storageDeleteError.message);
+                }
+            }
+
+            setPremiumTestPapers(prev => prev.filter(p => p.id !== paper.id));
+            setMessage({ type: 'success', text: 'Paper deleted.' });
+        } catch (err) {
+            setMessage({ type: 'error', text: `Failed to delete paper: ${err.message}` });
+        }
     }
 
     async function toggleTestPaperFree(paper) {
@@ -852,7 +900,11 @@ export default function Admin() {
         setDuration(quiz.duration_minutes);
         setNegativeMarking(quiz.negative_marking);
         setNegativeMarks(quiz.negative_marks || 0.25);
-        setQuizScope(resolveQuizScope(quiz));
+        const resolvedScope = resolveQuizScope(quiz);
+        const emptyOptions = resolvedScope === 'premium'
+            ? ['', '', '', '', '']
+            : ['', '', '', ''];
+        setQuizScope(resolvedScope);
 
         // Fetch linked worksheet
         const { data: wsData } = await supabase
@@ -870,17 +922,21 @@ export default function Admin() {
                 try {
                     parsedOpts = JSON.parse(parsedOpts);
                 } catch (e) {
-                    parsedOpts = ['', '', '', ''];
+                    parsedOpts = [...emptyOptions];
                 }
             }
             if (!Array.isArray(parsedOpts)) {
-                parsedOpts = ['', '', '', ''];
+                parsedOpts = [...emptyOptions];
             }
+
+            const normalizedOpts = resolvedScope === 'premium'
+                ? [...parsedOpts.slice(0, 5), ...Array(Math.max(0, 5 - parsedOpts.length)).fill('')]
+                : parsedOpts.slice(0, 4);
 
             return {
                 id: q.id,
                 question_text: q.question_text || '',
-                options: parsedOpts,
+                options: normalizedOpts,
                 correct_option: q.correct_option || 0,
                 solution: q.solution || '',
                 solution_image: q.solution_image || null,
@@ -900,7 +956,12 @@ export default function Admin() {
     }
 
     function handleParseBulk() {
-        const parsed = parseBulkQuestions(bulkText);
+        const parsed = parseBulkQuestions(bulkText, isPremiumQuizScope).map((q) => ({
+            ...q,
+            options: isPremiumQuizScope
+                ? [...q.options.slice(0, 5), ...Array(Math.max(0, 5 - q.options.length)).fill('')]
+                : q.options.slice(0, 4),
+        }));
         if (parsed.length === 0) {
             setMessage({ type: 'error', text: 'No valid questions found. Check the format.' });
             return;
@@ -914,7 +975,7 @@ export default function Admin() {
         setQuestions([...questions, {
             id: null,
             question_text: '',
-            options: ['', '', '', ''],
+            options: isPremiumQuizScope ? ['', '', '', '', ''] : ['', '', '', ''],
             correct_option: 0,
             solution: '',
             solution_image: null,
@@ -1570,11 +1631,27 @@ export default function Admin() {
                                         {inputMode === 'bulk' ? (
                                             <div className="bulk-section">
                                                 <p className="helper-text">
-                                                    Format: Question text on one line, then options A, B, C, D. Mark correct option with *.
+                                                    Format: Question text on one line, then options {isPremiumQuizScope ? 'A, B, C, D, E' : 'A, B, C, D'}. Mark correct option with *.
                                                     Add optional "Solution:" or "Exp:" line. Add optional "SolImage:" line with URL. Separate questions with a blank line.
                                                 </p>
                                                 <pre className="format-example">
-                                                    {`Q1. Which shape has 3 sides?
+                                                    {isPremiumQuizScope ? `Q1. Which shape has 3 sides?
+A: Circle
+B: Square
+C: Triangle*
+D: Rectangle
+E: Pentagon
+Solution:
+A triangle is a polygon with three edges and three vertices.
+SolImage: https://example.com/triangle.png
+
+Q2. What is 5 x 5?
+A: 20
+B: 25*
+C: 30
+D: 35
+E: 40
+Exp: 5 times 5 equals 25.` : `Q1. Which shape has 3 sides?
 A: Circle
 B: Square
 C: Triangle*
@@ -1637,7 +1714,7 @@ Exp: 5 times 5 equals 25.`}
                                                             </div>
                                                         )}
                                                         <div className="mq-options">
-                                                            {q.options.map((opt, oi) => (
+                                                            {Array.from({ length: optionCount }, (_, oi) => q.options[oi] || '').map((opt, oi) => (
                                                                 <div key={oi} className="mq-option-row">
                                                                     <label className={`mq-radio ${q.correct_option === oi ? 'correct' : ''}`}>
                                                                         <input
