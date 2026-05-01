@@ -266,10 +266,12 @@ export default function NVRWorksheets() {
   async function handleDownload(ws) {
     if (!canAccess(ws)) { handleSubscribe(); return; }
     if (!ws.file_url) { showToast('File not available yet.', 'info'); return; }
-    await supabase
+    // Increment download count directly on the table
+    supabase
       .from('premium_nvr_worksheets')
       .update({ download_count: (ws.download_count || 0) + 1 })
-      .eq('id', ws.id);
+      .eq('id', ws.id)
+      .then(() => {});
     window.open(ws.file_url, '_blank');
     setWorksheets(prev => prev.map(w => w.id === ws.id ? { ...w, download_count: (w.download_count || 0) + 1 } : w));
   }

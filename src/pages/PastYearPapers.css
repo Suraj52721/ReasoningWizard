@@ -273,13 +273,20 @@
     border-radius: 999px;
 }
 
+/* ── Card actions container ──────────────────────────────── */
+.pyp-card-actions {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0 0.9rem 0.9rem;
+}
+
 /* ── Download button ─────────────────────────────────────── */
 .pyp-download-btn {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    margin: 0 0.9rem 0.9rem;
+    flex: 1;
     padding: 0.5rem;
     border-radius: var(--radius-sm);
     font-size: 0.85rem;
@@ -293,6 +300,45 @@
 .pyp-download-btn:hover {
     opacity: 0.88;
     transform: translateY(-1px);
+}
+
+/* ── Request Answer button ───────────────────────────────── */
+.pyp-request-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    flex: 1;
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1.5px solid rgba(139, 92, 246, 0.35);
+    background: rgba(139, 92, 246, 0.1);
+    color: #a78bfa;
+    transition: all 0.2s ease;
+}
+
+.pyp-request-btn:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.5);
+    transform: translateY(-1px);
+}
+
+.pyp-request-btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.pyp-request-btn.requested {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.3);
+    color: #22c55e;
+    cursor: default;
+}
+
+.pyp-request-btn:disabled {
+    opacity: 0.75;
 }
 
 /* ── Responsive ──────────────────────────────────────────── */

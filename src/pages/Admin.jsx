@@ -239,6 +239,12 @@ export default function Admin() {
     const [studentSortField, setStudentSortField] = useState('name');
     const [studentSortDir, setStudentSortDir] = useState('asc');
 
+    // Answer request state
+    const [answerRequestCounts, setAnswerRequestCounts] = useState({});
+    const [requestPopup, setRequestPopup] = useState(null);
+    const [requestPopupLoading, setRequestPopupLoading] = useState(false);
+    const [requestPopupData, setRequestPopupData] = useState([]);
+
     useEffect(() => {
         fetchQuizzes();
         fetchWorksheets();
@@ -248,7 +254,7 @@ export default function Admin() {
 
     useEffect(() => {
         if (tab === 'visitors') fetchVisitors();
-        if (tab === 'pastpapers') fetchPastPapers();
+        if (tab === 'pastpapers') { fetchPastPapers(); fetchAnswerRequestCounts(); }
         if (tab === 'reports') fetchReports();
         if (tab === 'premium_nvr') fetchPremiumNVR();
         if (tab === 'premium_papers') { fetchPremiumTestPapers(); fetchTestPaperBundles(); }
@@ -313,32 +319,22 @@ export default function Admin() {
     }
 
     async function fetchWorksheets() {
-        const [{ data }, { data: logs, error: logsError }] = await Promise.all([
-            supabase.from('daily_worksheets').select('id, quiz_id, title, subject, worksheet_date, file_url, file_name, file_path, download_count').order('worksheet_date', { ascending: false }).limit(200),
-            supabase.from('download_logs').select('resource_id').eq('resource_type', 'worksheet'),
-        ]);
-        const countMap = (logs || []).reduce((acc, d) => { acc[d.resource_id] = (acc[d.resource_id] || 0) + 1; return acc; }, {});
-        setWorksheets((data || []).map(w => ({
-            ...w,
-            download_count: logsError
-                ? (w.download_count || 0)
-                : ((countMap[w.id] || 0) + (w.download_count || 0)),
-        })));
+        const { data } = await supabase
+            .from('daily_worksheets')
+            .select('id, quiz_id, title, subject, worksheet_date, file_url, file_name, file_path, download_count')
+            .order('worksheet_date', { ascending: false })
+            .limit(200);
+        setWorksheets(data || []);
     }
 
     async function fetchPastPapers() {
         setLoadingPastPapers(true);
-        const [{ data: papers }, { data: logs, error: logsError }] = await Promise.all([
-            supabase.from('past_papers').select('*').order('year', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }),
-            supabase.from('download_logs').select('resource_id').eq('resource_type', 'past_paper'),
-        ]);
-        const countMap = (logs || []).reduce((acc, d) => { acc[d.resource_id] = (acc[d.resource_id] || 0) + 1; return acc; }, {});
-        setPastPapers((papers || []).map(p => ({
-            ...p,
-            download_count: logsError
-                ? (p.download_count || 0)
-                : ((countMap[p.id] || 0) + (p.download_count || 0)),
-        })));
+        const { data: papers } = await supabase
+            .from('past_papers')
+            .select('*')
+            .order('year', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false });
+        setPastPapers(papers || []);
         setLoadingPastPapers(false);
     }
 
@@ -380,6 +376,31 @@ export default function Admin() {
         await supabase.from('past_papers').delete().eq('id', paper.id);
         setPastPapers(prev => prev.filter(p => p.id !== paper.id));
         setMessage({ type: 'success', text: 'Paper deleted.' });
+    }
+
+    async function fetchAnswerRequestCounts() {
+        const { data, error } = await supabase
+            .from('answer_requests')
+            .select('paper_id');
+        if (!error && data) {
+            const counts = {};
+            data.forEach(r => {
+                counts[r.paper_id] = (counts[r.paper_id] || 0) + 1;
+            });
+            setAnswerRequestCounts(counts);
+        }
+    }
+
+    async function openRequestPopup(paper) {
+        setRequestPopup(paper);
+        setRequestPopupLoading(true);
+        const { data, error } = await supabase
+            .from('answer_requests')
+            .select('id, user_name, user_email, created_at')
+            .eq('paper_id', paper.id)
+            .order('created_at', { ascending: false });
+        setRequestPopupData(error ? [] : (data || []));
+        setRequestPopupLoading(false);
     }
 
     async function fetchReports() {
@@ -2021,6 +2042,16 @@ Exp: 5 times 5 equals 25.`}
                                                                         <span className="manage-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.25)' }} title="Total downloads">
                                                                             ↓ {paper.download_count ?? 0}
                                                                         </span>
+                                                                        {(answerRequestCounts[paper.id] || 0) > 0 && (
+                                                                            <span
+                                                                                className="manage-badge request-count-badge"
+                                                                                style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', borderColor: 'rgba(139,92,246,0.3)', cursor: 'pointer' }}
+                                                                                title="Answer requests — click for details"
+                                                                                onClick={() => openRequestPopup(paper)}
+                                                                            >
+                                                                                ✉ {answerRequestCounts[paper.id]} request{answerRequestCounts[paper.id] !== 1 ? 's' : ''}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                                 <div className="manage-card-actions" style={{ display: 'flex', gap: '0.5rem' }}>
@@ -2046,6 +2077,59 @@ Exp: 5 times 5 equals 25.`}
                                             );
                                         })
                                     )}
+
+                                    {/* Answer Request Popup */}
+                                    <AnimatePresence>
+                                        {requestPopup && (
+                                            <motion.div
+                                                className="admin-popup-overlay"
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                onClick={() => setRequestPopup(null)}
+                                            >
+                                                <motion.div
+                                                    className="admin-popup-modal glass-card"
+                                                    initial={{ opacity: 0, scale: 0.92, y: 16 }}
+                                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                    exit={{ opacity: 0, scale: 0.92, y: 16 }}
+                                                    onClick={e => e.stopPropagation()}
+                                                >
+                                                    <div className="admin-popup-header">
+                                                        <h3>Answer Requests — {requestPopup.title}</h3>
+                                                        <button className="admin-popup-close" onClick={() => setRequestPopup(null)}><FiX /></button>
+                                                    </div>
+                                                    {requestPopupLoading ? (
+                                                        <div className="loading-state" style={{ padding: '2rem' }}>
+                                                            <motion.div className="spinner" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
+                                                            <p>Loading requests…</p>
+                                                        </div>
+                                                    ) : requestPopupData.length === 0 ? (
+                                                        <div className="empty-state" style={{ padding: '2rem', textAlign: 'center' }}>
+                                                            <p style={{ color: 'var(--text-secondary)' }}>No requests for this paper yet.</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="admin-request-list">
+                                                            <div className="admin-request-header-row">
+                                                                <span>#</span>
+                                                                <span>Name</span>
+                                                                <span>Email</span>
+                                                                <span>Date</span>
+                                                            </div>
+                                                            {requestPopupData.map((req, i) => (
+                                                                <div key={req.id} className="admin-request-row">
+                                                                    <span className="req-num">{i + 1}</span>
+                                                                    <span className="req-name">{req.user_name || 'N/A'}</span>
+                                                                    <span className="req-email">{req.user_email || 'N/A'}</span>
+                                                                    <span className="req-date">{new Date(req.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </motion.div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </motion.div>
                             )}
 

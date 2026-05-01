@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { FiDownload, FiFileText, FiFilter, FiSearch, FiChevronDown } from 'react-icons/fi';
+import { FiDownload, FiFileText, FiFilter, FiSearch, FiChevronDown, FiMessageCircle } from 'react-icons/fi';
 import SEO from '../components/SEO';
 import logo from '../assets/logo.png';
 import PaperThumbnail, { DIFFICULTY_CONFIG } from '../components/PaperThumbnail';
@@ -50,12 +50,14 @@ function LoginPopup({ onClose }) {
 }
 
 export default function PastYearPapers() {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const [papers, setPapers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [selectedSubject, setSelectedSubject] = useState('All');
     const [showLoginPopup, setShowLoginPopup] = useState(false);
+    const [requestedPapers, setRequestedPapers] = useState(new Set());
+    const [requestingId, setRequestingId] = useState(null);
 
     const easyRef = useRef(null);
     const mediumRef = useRef(null);
@@ -65,6 +67,40 @@ export default function PastYearPapers() {
     useEffect(() => {
         fetchPapers();
     }, []);
+
+    useEffect(() => {
+        if (user) fetchUserRequests();
+    }, [user]);
+
+    async function fetchUserRequests() {
+        const { data } = await supabase
+            .from('answer_requests')
+            .select('paper_id')
+            .eq('user_id', user.id);
+        if (data) setRequestedPapers(new Set(data.map(r => r.paper_id)));
+    }
+
+    async function handleRequestAnswer(paperId) {
+        if (!user) { setShowLoginPopup(true); return; }
+        if (requestedPapers.has(paperId)) return;
+        setRequestingId(paperId);
+        try {
+            const userEmail = user.email || '';
+            const userName = profile?.display_name || user.user_metadata?.full_name || '';
+            const { error } = await supabase.from('answer_requests').insert({
+                paper_id: paperId,
+                user_id: user.id,
+                user_name: userName,
+                user_email: userEmail,
+            });
+            if (!error) {
+                setRequestedPapers(prev => new Set([...prev, paperId]));
+            }
+        } catch (err) {
+            console.error('Request answer error:', err);
+        }
+        setRequestingId(null);
+    }
 
     async function fetchPapers() {
         setLoading(true);
@@ -83,6 +119,7 @@ export default function PastYearPapers() {
 
     function handlePaperAccess(e, paperId) {
         if (user) {
+            // Log download
             supabase.from('download_logs').insert({ resource_type: 'past_paper', resource_id: paperId });
             return;
         }
@@ -248,17 +285,31 @@ export default function PastYearPapers() {
                                                         </div>
                                                     </div>
 
-                                                    <a
-                                                        href={paper.file_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        download
-                                                        className="pyp-download-btn"
-                                                        style={{ '--diff-color': cfg.color }}
-                                                        onClick={(e) => handlePaperAccess(e, paper.id)}
-                                                    >
-                                                        <FiDownload /> Download
-                                                    </a>
+                                                    <div className="pyp-card-actions">
+                                                        <a
+                                                            href={paper.file_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            download
+                                                            className="pyp-download-btn"
+                                                            style={{ '--diff-color': cfg.color }}
+                                                            onClick={(e) => handlePaperAccess(e, paper.id)}
+                                                        >
+                                                            <FiDownload /> Download
+                                                        </a>
+                                                        <button
+                                                            className={`pyp-request-btn ${requestedPapers.has(paper.id) ? 'requested' : ''}`}
+                                                            onClick={(e) => { e.stopPropagation(); handleRequestAnswer(paper.id); }}
+                                                            disabled={requestedPapers.has(paper.id) || requestingId === paper.id}
+                                                        >
+                                                            <FiMessageCircle />
+                                                            {requestingId === paper.id
+                                                                ? 'Requesting…'
+                                                                : requestedPapers.has(paper.id)
+                                                                    ? 'Requested ✓'
+                                                                    : 'Request Answer'}
+                                                        </button>
+                                                    </div>
                                                 </motion.div>
                                             ))}
                                         </AnimatePresence>

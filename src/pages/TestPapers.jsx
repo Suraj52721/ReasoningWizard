@@ -368,10 +368,12 @@ export default function TestPapers() {
   async function handleDownload(paper) {
     if (!canAccess(paper)) { handleBuyPaper(paper); return; }
     if (!paper.file_url) { showToast('File not available yet.', 'info'); return; }
-    await supabase
+    // Increment download count directly on the table
+    supabase
       .from('premium_test_papers')
       .update({ download_count: (paper.download_count || 0) + 1 })
-      .eq('id', paper.id);
+      .eq('id', paper.id)
+      .then(() => {});
     window.open(paper.file_url, '_blank');
     setPapers((prev) => {
       const updated = { ...prev };
