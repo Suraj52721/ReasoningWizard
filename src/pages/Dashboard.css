@@ -218,6 +218,78 @@
     opacity: 0.8;
 }
 
+.quiz-card.locked {
+    position: relative;
+}
+
+.locked-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--primary);
+    background: rgba(245, 197, 24, 0.12);
+    border: 1px solid rgba(245, 197, 24, 0.3);
+}
+
+.quiz-locked-cta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+}
+
+.quiz-locked-text {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.quiz-locked-text strong {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* Purchase popup */
+.purchase-popup-badge {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    color: var(--primary);
+    border-radius: 50%;
+    background: rgba(245, 197, 24, 0.12);
+    border: 1px solid rgba(245, 197, 24, 0.3);
+}
+
+.purchase-popup-price {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.4rem;
+    margin: 1.25rem 0;
+}
+
+.purchase-price-amount {
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1;
+}
+
+.purchase-price-period {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
 .quiz-card-header {
     display: flex;
     justify-content: space-between;

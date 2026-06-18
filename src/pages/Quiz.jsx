@@ -125,6 +125,15 @@ export default function Quiz() {
         setQuiz(quizData);
         setQuestions(questionsData || []);
 
+        // No questions returned means the quiz is locked (gated by RLS once it is
+        // older than the free 5-day window) or unavailable. Don't render an empty
+        // quiz — direct the user to unlock it.
+        if (!questionsData || questionsData.length === 0) {
+            setError('This quiz is locked. Only the latest 5 days are free — purchase dashboard access to unlock past quizzes.');
+            setPhase('error');
+            return;
+        }
+
         if (attemptData) {
             // If reattempt flag is set, skip showing results and go to ready
             const isReattempt = searchParams.get('reattempt') === 'true';
@@ -175,7 +184,7 @@ export default function Quiz() {
 
     async function fetchLeaderboard(currentStats = result) {
         const { data: attempts } = await supabase
-            .from('quiz_attempts')
+            .from('public_quiz_attempts')
             .select('score, total_questions, time_taken_seconds, user_id')
             .eq('quiz_id', id)
             .order('score', { ascending: false })
@@ -186,7 +195,7 @@ export default function Quiz() {
 
         const userIds = [...new Set(attempts.map(a => a.user_id))];
         const { data: profilesData } = await supabase
-            .from('profiles')
+            .from('public_profiles')
             .select('id, display_name')
             .in('id', userIds);
 
@@ -206,7 +215,7 @@ export default function Quiz() {
 
         // Fetch all scores for average calculation (optimization: could be an RPC or separate query)
         const { data: allScores } = await supabase
-            .from('quiz_attempts')
+            .from('public_quiz_attempts')
             .select('score')
             .eq('quiz_id', id);
 
@@ -229,14 +238,14 @@ export default function Quiz() {
         // 2. If not, query database for exact rank
         // Count users with better score
         const { count: betterScoreCount } = await supabase
-            .from('quiz_attempts')
+            .from('public_quiz_attempts')
             .select('id', { count: 'exact', head: true })
             .eq('quiz_id', id)
             .gt('score', currentStats.score);
 
         // Count users with same score but better time
         const { count: sameScoreBetterTime } = await supabase
-            .from('quiz_attempts')
+            .from('public_quiz_attempts')
             .select('id', { count: 'exact', head: true })
             .eq('quiz_id', id)
             .eq('score', currentStats.score)

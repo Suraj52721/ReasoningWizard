@@ -81,6 +81,15 @@ serve(async (req) => {
           .eq("status", "pending");
 
         if (error) throw error;
+      } else if (type === "dashboard_purchase") {
+        const { error } = await supabaseAdmin
+          .from("dashboard_purchases")
+          .update({ status: "cancelled" })
+          .eq("razorpay_order_id", razorpay_order_id)
+          .eq("user_id", user.id)
+          .eq("status", "pending");
+
+        if (error) throw error;
       } else if (type === "bundle_purchase" || type === "individual_paper_purchase") {
         const { error } = await supabaseAdmin
           .from("paper_purchases")
@@ -144,6 +153,27 @@ serve(async (req) => {
           razorpay_signature,
           status: "active",
           started_at: new Date().toISOString(),
+          expires_at: expiresAt.toISOString(),
+        })
+        .eq("razorpay_order_id", razorpay_order_id)
+        .eq("user_id", user.id)
+        .eq("status", "pending");
+
+      if (error) throw error;
+
+    } else if (type === "dashboard_purchase") {
+      // Dashboard access is a 1-year subscription.
+      const purchasedAt = new Date();
+      const expiresAt = new Date(purchasedAt);
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+      const { error } = await supabaseAdmin
+        .from("dashboard_purchases")
+        .update({
+          razorpay_payment_id,
+          razorpay_signature,
+          status: "completed",
+          purchased_at: purchasedAt.toISOString(),
           expires_at: expiresAt.toISOString(),
         })
         .eq("razorpay_order_id", razorpay_order_id)

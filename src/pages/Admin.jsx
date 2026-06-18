@@ -138,6 +138,7 @@ export default function Admin() {
     const [nvrSortOrder, setNvrSortOrder] = useState(0);
     const [nvrSaving, setNvrSaving] = useState(false);
     const [globalNvrPrice, setGlobalNvrPrice] = useState(7900);
+    const [globalDashboardPrice, setGlobalDashboardPrice] = useState(999);
 
     // ── Premium Test Papers tab ─────────────────────────────────
     const [premiumTestPapers, setPremiumTestPapers] = useState([]);
@@ -677,8 +678,11 @@ export default function Admin() {
         try {
             const { data: priceData } = await supabase.from('app_settings').select('value').eq('key', 'nvr_sub_price_pence').single();
             if (priceData && priceData.value) setGlobalNvrPrice(parseInt(priceData.value, 10));
+            
+            const { data: dashPriceData } = await supabase.from('app_settings').select('value').eq('key', 'dashboard_price_pence').maybeSingle();
+            if (dashPriceData && dashPriceData.value) setGlobalDashboardPrice(parseInt(dashPriceData.value, 10));
         } catch (e) {
-            console.error('Failed to fetch global NVR price:', e);
+            console.error('Failed to fetch global prices:', e);
         }
 
         setLoadingPremiumNVR(false);
@@ -693,6 +697,18 @@ export default function Admin() {
         else {
             setMessage({ type: 'success', text: 'NVR Subscription price updated globally!' });
             setGlobalNvrPrice(parseInt(p));
+        }
+    }
+
+    async function updateGlobalDashboardPrice() {
+        const p = prompt("Enter new global Dashboard Tiles 1-Year Access price in pence (£1 = 100):", globalDashboardPrice);
+        if (!p || isNaN(p) || parseInt(p) < 0) return;
+
+        const { error } = await supabase.from('app_settings').upsert({ key: 'dashboard_price_pence', value: parseInt(p).toString() });
+        if (error) setMessage({ type: 'error', text: 'Error updating dashboard price.' });
+        else {
+            setMessage({ type: 'success', text: 'Dashboard Tiles price updated globally!' });
+            setGlobalDashboardPrice(parseInt(p));
         }
     }
 
@@ -2473,6 +2489,24 @@ Exp: 5 times 5 equals 25.`}
                                                 type="button"
                                                 className="btn-secondary btn-sm"
                                                 onClick={updateGlobalNvrPrice}
+                                                whileHover={{ scale: 1.03 }}
+                                                whileTap={{ scale: 0.97 }}
+                                            >
+                                                Change price
+                                            </motion.button>
+                                        )}
+                                    </div>
+                                    <div className="nvr-price-bar glass-card" style={{ marginBottom: '1.5rem' }}>
+                                        <div className="nvr-price-copy">
+                                            <span className="nvr-price-label">Dashboard Tiles 1-Year Access pricing</span>
+                                            <strong>£{(globalDashboardPrice / 100).toFixed(2)}</strong>
+                                            <small>This is the global 1-year access price stored in <span>app_settings</span>.</small>
+                                        </div>
+                                        {!isReadOnly && (
+                                            <motion.button
+                                                type="button"
+                                                className="btn-secondary btn-sm"
+                                                onClick={updateGlobalDashboardPrice}
                                                 whileHover={{ scale: 1.03 }}
                                                 whileTap={{ scale: 0.97 }}
                                             >

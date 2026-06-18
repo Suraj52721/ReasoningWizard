@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiCalendar, FiDownload, FiExternalLink, FiFileText } from 'react-icons/fi';
+import { FiCalendar, FiDownload, FiExternalLink, FiFileText, FiLock } from 'react-icons/fi';
 import { supabase } from '../lib/supabaseClient';
 
 function logWorksheetDownload(id) {
@@ -38,8 +39,8 @@ export default function DailyWorksheet() {
     async function fetchWorksheets() {
         setLoading(true);
         const { data, error } = await supabase
-            .from('daily_worksheets')
-            .select('id, title, subject, worksheet_date, file_url, created_at')
+            .from('public_daily_worksheets')
+            .select('id, title, subject, worksheet_date, file_url, is_locked, created_at')
             .order('worksheet_date', { ascending: false })
             .order('created_at', { ascending: false });
 
@@ -93,26 +94,37 @@ export default function DailyWorksheet() {
                                 </div>
                                 <h2 className="worksheet-card-title">{worksheet.title}</h2>
 
-                                <div className="worksheet-actions">
-                                    <a
-                                        href={worksheet.file_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="btn-secondary worksheet-btn"
-                                    >
-                                        <FiExternalLink /> Open
-                                    </a>
-                                    <a
-                                        href={worksheet.file_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        download
-                                        className="btn-primary worksheet-btn"
-                                        onClick={() => logWorksheetDownload(worksheet.id)}
-                                    >
-                                        <FiDownload /> Download
-                                    </a>
-                                </div>
+                                {worksheet.is_locked ? (
+                                    <div className="worksheet-actions worksheet-locked">
+                                        <p className="worksheet-locked-text">
+                                            <FiLock /> Locked — only the latest 5 days are free.
+                                        </p>
+                                        <Link to="/dashboard" className="btn-primary worksheet-btn">
+                                            <FiLock /> Unlock with Dashboard access
+                                        </Link>
+                                    </div>
+                                ) : (
+                                    <div className="worksheet-actions">
+                                        <a
+                                            href={worksheet.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="btn-secondary worksheet-btn"
+                                        >
+                                            <FiExternalLink /> Open
+                                        </a>
+                                        <a
+                                            href={worksheet.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            download
+                                            className="btn-primary worksheet-btn"
+                                            onClick={() => logWorksheetDownload(worksheet.id)}
+                                        >
+                                            <FiDownload /> Download
+                                        </a>
+                                    </div>
+                                )}
                             </motion.article>
                         ))}
                     </div>

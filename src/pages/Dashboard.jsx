@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
-import { FiCalendar, FiClock, FiPlay, FiUser, FiEdit2, FiSave, FiTrendingUp, FiAward, FiCheckCircle, FiBook, FiRefreshCw, FiDownload, FiX, FiLogIn, FiArrowRight } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiPlay, FiUser, FiEdit2, FiSave, FiTrendingUp, FiAward, FiCheckCircle, FiBook, FiRefreshCw, FiDownload, FiX, FiLogIn, FiArrowRight, FiLock } from 'react-icons/fi';
 import logo from '../assets/logo.png';
+import { createRazorpayOrder, verifyRazorpayPayment, openRazorpayCheckout, loadRazorpayScript } from '../lib/razorpay';
 import './Dashboard.css';
 import './Home.css';
 
@@ -60,6 +61,55 @@ function LoginPopup({ onClose }) {
     );
 }
 
+function PurchasePopup({ onClose, onPurchase, price, purchasing }) {
+    return (
+        <motion.div
+            className="login-popup-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={onClose}
+        >
+            <motion.div
+                className="login-popup glass-card"
+                initial={{ opacity: 0, scale: 0.85, y: 30 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: 30 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                onClick={e => e.stopPropagation()}
+            >
+                <button className="popup-close" onClick={onClose}>
+                    <FiX />
+                </button>
+                <div className="purchase-popup-badge">
+                    <FiLock />
+                </div>
+                <h2 className="popup-title">Unlock Unlimited Access</h2>
+                <p className="popup-desc">
+                    Get <strong>1 year</strong> of unlimited access to <strong>all past quizzes &amp; worksheets</strong> — including everything older than 5 days.
+                </p>
+                <div className="purchase-popup-price">
+                    <span className="purchase-price-amount">£{(price / 100).toFixed(2)}</span>
+                    <span className="purchase-price-period">/ 1 year</span>
+                </div>
+                <div className="popup-actions">
+                    <motion.button
+                        className="btn-primary popup-btn"
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={onPurchase}
+                        disabled={purchasing}
+                    >
+                        <FiLock /> {purchasing ? 'Processing...' : 'Purchase Now'}
+                    </motion.button>
+                </div>
+                <p className="popup-footer">Secure checkout · 1 year access · Cancel anytime</p>
+            </motion.div>
+        </motion.div>
+    );
+}
+
 const fadeUp = {
     hidden: { opacity: 0, y: 30 },
     visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.5 } })
@@ -70,7 +120,7 @@ const stagger = {
 };
 
 export default function Dashboard() {
-    const { user, profile, updateProfile } = useAuth();
+    const { user, profile, updateProfile, loading: authLoading } = useAuth();
     const navigate = useNavigate();
     const [tab, setTab] = useState('quizzes');
     const [quizzes, setQuizzes] = useState([]);
@@ -84,11 +134,25 @@ export default function Dashboard() {
     const [profileForm, setProfileForm] = useState({ display_name: '', phone: '' });
     const [savingProfile, setSavingProfile] = useState(false);
     const [showLoginPopup, setShowLoginPopup] = useState(false);
+    const [showPurchasePopup, setShowPurchasePopup] = useState(false);
+    const [hasDashboardAccess, setHasDashboardAccess] = useState(false);
+    const [dashboardPrice, setDashboardPrice] = useState(999);
+    const [purchasing, setPurchasing] = useState(false);
 
     useEffect(() => {
-        fetchQuizzes();
         fetchLeaderboard();
+        loadRazorpayScript();
     }, []);
+
+    // Refetch quizzes/access whenever auth resolves or the signed-in user (or
+    // their admin status) changes. Without this, the lock state is computed from
+    // a stale `user`/`profile` captured on first mount — which on a hard load
+    // evaluates before the session resolves and renders everything unlocked.
+    useEffect(() => {
+        if (authLoading) return;
+        fetchQuizzes();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authLoading, user?.id]);
 
     useEffect(() => {
         if (profile) {
@@ -122,6 +186,7 @@ export default function Dashboard() {
         );
 
         let attemptsData = [], sessionsData = [];
+        let hasAccess = false;
         if (user) {
             const { data: aData } = await supabase
                 .from('quiz_attempts')
@@ -131,25 +196,46 @@ export default function Dashboard() {
                 .from('quiz_sessions')
                 .select('*')
                 .eq('user_id', user.id);
+            // Dashboard access is a 1-year subscription: a completed purchase
+            // counts only while it hasn't expired (NULL expires_at = legacy lifetime).
+            const nowIso = new Date().toISOString();
+            const { data: pData } = await supabase
+                .from('dashboard_purchases')
+                .select('id, expires_at')
+                .eq('user_id', user.id)
+                .eq('status', 'completed')
+                .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+                .limit(1);
             attemptsData = aData || [];
             sessionsData = sData || [];
+            // Access is granted only by an active (completed, non-expired) purchase.
+            // Admins are NOT exempt — they see the locked state like normal users.
+            if (pData && pData.length > 0) hasAccess = true;
         }
 
         const { data: wsData } = await supabase
-            .from('daily_worksheets')
+            .from('public_daily_worksheets')
             .select('id, quiz_id, file_url, file_name');
+
+        const { data: priceData } = await supabase
+            .from('app_settings')
+            .select('value')
+            .eq('key', 'dashboard_price_pence')
+            .maybeSingle();
 
         setQuizzes(dashboardOnlyQuizzes);
         setAttempts(attemptsData);
         setSessions(sessionsData);
         setWorksheets(wsData || []);
+        setHasDashboardAccess(hasAccess);
+        if (priceData && priceData.value) setDashboardPrice(parseInt(priceData.value, 10));
         setLoadingQuizzes(false);
     }
 
     async function fetchLeaderboard() {
         const today = new Date().toISOString().split('T')[0];
         const { data: attempts } = await supabase
-            .from('quiz_attempts')
+            .from('public_quiz_attempts')
             .select('score, total_questions, time_taken_seconds, completed_at, user_id')
             .gte('completed_at', today + 'T00:00:00')
             .order('score', { ascending: false })
@@ -160,7 +246,7 @@ export default function Dashboard() {
 
         const userIds = [...new Set(attempts.map(a => a.user_id))];
         const { data: profilesData } = await supabase
-            .from('profiles')
+            .from('public_profiles')
             .select('id, display_name, avatar_url')
             .in('id', userIds);
 
@@ -183,6 +269,68 @@ export default function Dashboard() {
     const getAttempt = (quizId) => attempts.find(a => a.quiz_id === quizId);
     const getSession = (quizId) => sessions.find(s => s.quiz_id === quizId);
     const getWorksheet = (quiz) => worksheets.find(w => w.quiz_id === quiz.id);
+
+    const isQuizLocked = (dateStr) => {
+        // Logged-out visitors never see the locked/purchase state. Their tiles
+        // look normal and clicking prompts the sign-in / create-account popup.
+        // The purchase lock only applies to signed-in users without access.
+        if (!user) return false;
+        if (hasDashboardAccess) return false;
+        if (!dateStr) return false;
+        const quizDate = new Date(dateStr + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Normalize today to midnight
+        const diffDays = (today - quizDate) / (1000 * 60 * 60 * 24);
+        // Only the most recent 5 days (today + previous 4) stay unlocked.
+        // Anything older than that locks automatically as days pass.
+        return diffDays >= 5;
+    };
+
+    const handlePurchaseAccess = async () => {
+        if (!user) {
+            setShowLoginPopup(true);
+            return;
+        }
+        setPurchasing(true);
+        try {
+            const { order_id, amount, currency } = await createRazorpayOrder({
+                amount: dashboardPrice,
+                currency: 'GBP',
+                receipt: `receipt_dash_${Date.now()}`,
+                type: 'dashboard_purchase'
+            });
+
+            openRazorpayCheckout({
+                orderId: order_id,
+                amount,
+                currency,
+                description: 'Dashboard Access (1 Year)',
+                prefill: {
+                    name: profile?.display_name || user.email,
+                    email: user.email,
+                    contact: profile?.phone || ''
+                },
+                onSuccess: async (response) => {
+                    await verifyRazorpayPayment({
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature,
+                        type: 'dashboard_purchase'
+                    });
+                    setHasDashboardAccess(true);
+                    setShowPurchasePopup(false);
+                    alert("Dashboard Access Unlocked Successfully!");
+                },
+                onFailure: (err) => {
+                    alert(err.message || 'Payment failed.');
+                }
+            });
+        } catch (err) {
+            alert(err.message || 'Error initiating payment');
+        } finally {
+            setPurchasing(false);
+        }
+    };
 
     const subjects = useMemo(() => {
         const s = [...new Set(quizzes.map(q => q.subject).filter(Boolean))].sort();
@@ -208,56 +356,75 @@ export default function Dashboard() {
         const attempt = getAttempt(quiz.id);
         const session = getSession(quiz.id);
         const worksheet = getWorksheet(quiz);
+        const locked = isQuizLocked(quiz.quiz_date);
+
         return (
-            <motion.div key={quiz.id} className={`quiz-card glass-card ${attempt ? 'completed' : ''}`} variants={fadeUp} custom={i} whileHover={{ y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
+            <motion.div key={quiz.id} className={`quiz-card glass-card ${attempt ? 'completed' : ''} ${locked ? 'locked' : ''}`} variants={fadeUp} custom={i} whileHover={locked ? {} : { y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
                 <div className="quiz-card-header">
                     <div className="quiz-subject-badge">{quiz.subject}</div>
-                    {attempt && <div className="completed-badge"><FiCheckCircle /> Done</div>}
+                    {locked ? (
+                        <div className="locked-badge"><FiLock /> Locked</div>
+                    ) : (
+                        attempt && <div className="completed-badge"><FiCheckCircle /> Done</div>
+                    )}
                 </div>
                 <h4 className="quiz-card-title">{quiz.title}</h4>
                 <div className="quiz-card-meta">
                     <span><FiClock /> {quiz.duration_minutes} min</span>
                     {attempt && <span><FiAward /> {attempt.score}/{attempt.total_questions}</span>}
                 </div>
-                {attempt ? (
-                    <div className="quiz-card-actions">
-                        <Link to={`/quiz/${quiz.id}`}>
-                            <motion.button className="btn-secondary quiz-btn" whileHover={{ scale: 1.02 }}>View Results</motion.button>
-                        </Link>
-                        <motion.button
-                            className="btn-primary quiz-btn reattempt-dashboard-btn"
-                            whileHover={{ scale: 1.02 }}
-                            onClick={async () => {
-                                await supabase.from('quiz_attempts').delete().eq('id', attempt.id);
-                                navigate(`/quiz/${quiz.id}?reattempt=true`);
-                            }}
-                        >
-                            <FiRefreshCw /> Re-attempt
+                {locked ? (
+                    <div className="quiz-card-actions quiz-locked-cta">
+                        <p className="quiz-locked-text">
+                            Purchase to unlock <strong>unlimited quizzes &amp; worksheets</strong> — get <strong>1 year access</strong>.
+                        </p>
+                        <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02 }} onClick={() => setShowPurchasePopup(true)} disabled={purchasing}>
+                            <FiLock /> {`Unlock for £${(dashboardPrice / 100).toFixed(2)} / 1 year`}
                         </motion.button>
                     </div>
-                ) : user ? (
-                    <Link to={`/quiz/${quiz.id}`}>
-                        <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }}>
-                            <FiPlay /> {session ? 'Resume Quiz' : 'Attempt Online'}
-                        </motion.button>
-                    </Link>
                 ) : (
-                    <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }} onClick={() => setShowLoginPopup(true)}>
-                        <FiPlay /> Attempt Online
-                    </motion.button>
-                )}
-                {worksheet && (
-                    user ? (
-                        <a href={worksheet.file_url} download={worksheet.file_name} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: '0.5rem' }} onClick={() => supabase.from('download_logs').insert({ resource_type: 'worksheet', resource_id: worksheet.id })}>
-                            <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" whileHover={{ scale: 1.02 }}>
-                                <FiDownload /> Download Worksheet
+                    <>
+                        {attempt ? (
+                            <div className="quiz-card-actions">
+                                <Link to={`/quiz/${quiz.id}`}>
+                                    <motion.button className="btn-secondary quiz-btn" whileHover={{ scale: 1.02 }}>View Results</motion.button>
+                                </Link>
+                                <motion.button
+                                    className="btn-primary quiz-btn reattempt-dashboard-btn"
+                                    whileHover={{ scale: 1.02 }}
+                                    onClick={async () => {
+                                        await supabase.from('quiz_attempts').delete().eq('id', attempt.id);
+                                        navigate(`/quiz/${quiz.id}?reattempt=true`);
+                                    }}
+                                >
+                                    <FiRefreshCw /> Re-attempt
+                                </motion.button>
+                            </div>
+                        ) : user ? (
+                            <Link to={`/quiz/${quiz.id}`}>
+                                <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }}>
+                                    <FiPlay /> {session ? 'Resume Quiz' : 'Attempt Online'}
+                                </motion.button>
+                            </Link>
+                        ) : (
+                            <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(245,197,24,0.3)' }} onClick={() => setShowLoginPopup(true)}>
+                                <FiPlay /> Attempt Online
                             </motion.button>
-                        </a>
-                    ) : (
-                        <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" style={{ marginTop: '0.5rem', width: '100%' }} whileHover={{ scale: 1.02 }} onClick={() => setShowLoginPopup(true)}>
-                            <FiDownload /> Download Worksheet
-                        </motion.button>
-                    )
+                        )}
+                        {worksheet && (
+                            user ? (
+                                <a href={worksheet.file_url} download={worksheet.file_name} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: '0.5rem' }} onClick={() => supabase.from('download_logs').insert({ resource_type: 'worksheet', resource_id: worksheet.id })}>
+                                    <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" whileHover={{ scale: 1.02 }}>
+                                        <FiDownload /> Download Worksheet
+                                    </motion.button>
+                                </a>
+                            ) : (
+                                <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" style={{ marginTop: '0.5rem', width: '100%' }} whileHover={{ scale: 1.02 }} onClick={() => setShowLoginPopup(true)}>
+                                    <FiDownload /> Download Worksheet
+                                </motion.button>
+                            )
+                        )}
+                    </>
                 )}
             </motion.div>
         );
@@ -354,7 +521,7 @@ export default function Dashboard() {
                                 </motion.div>
                             )}
 
-                            {loadingQuizzes ? (
+                            {(loadingQuizzes || authLoading) ? (
                                 <div className="loading-state">
                                     <motion.div className="spinner" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
                                     <p>Loading quizzes...</p>
@@ -366,7 +533,7 @@ export default function Dashboard() {
                                     <p>{quizzes.length === 0 ? 'Check back later for new daily quizzes!' : 'Try selecting a different subject.'}</p>
                                 </motion.div>
                             ) : activeSubject === 'All' ? (
-                                /* ── All: Subject → Date → Cards ── */
+                                /* ── All: Subject → Cards ── */
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key="all-grouped"
@@ -386,23 +553,15 @@ export default function Dashboard() {
                                                     <span className="subject-section-title">{subj}</span>
                                                     <span className="subject-section-count">{subjectQuizzes.length}</span>
                                                 </div>
-                                                {groupByDate(subjectQuizzes).map(({ date, quizzes: dateQuizzes }) => (
-                                                    <div key={date} className="date-group">
-                                                        <div className="date-group-header">
-                                                            <FiCalendar />
-                                                            <span>{formatDate(date)}</span>
-                                                        </div>
-                                                        <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
-                                                            {dateQuizzes.map((quiz, i) => renderCard(quiz, i))}
-                                                        </motion.div>
-                                                    </div>
-                                                ))}
+                                                <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
+                                                    {subjectQuizzes.map((quiz, i) => renderCard(quiz, i))}
+                                                </motion.div>
                                             </motion.div>
                                         ))}
                                     </motion.div>
                                 </AnimatePresence>
                             ) : (
-                                /* ── Single subject: Date → Cards ── */
+                                /* ── Single subject: Cards ── */
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key={activeSubject}
@@ -410,23 +569,9 @@ export default function Dashboard() {
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0, transition: { duration: 0.12 } }}
                                     >
-                                        {groupByDate(filteredQuizzes).map(({ date, quizzes: dateQuizzes }, di) => (
-                                            <motion.div
-                                                key={date}
-                                                className="date-group"
-                                                initial={{ opacity: 0, y: 14 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: di * 0.06, duration: 0.3 }}
-                                            >
-                                                <div className="date-group-header">
-                                                    <FiCalendar />
-                                                    <span>{formatDate(date)}</span>
-                                                </div>
-                                                <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible">
-                                                    {dateQuizzes.map((quiz, i) => renderCard(quiz, i))}
-                                                </motion.div>
-                                            </motion.div>
-                                        ))}
+                                        <motion.div className="quiz-cards" variants={stagger} initial="hidden" animate="visible" style={{ marginTop: '1rem' }}>
+                                            {filteredQuizzes.map((quiz, i) => renderCard(quiz, i))}
+                                        </motion.div>
                                     </motion.div>
                                 </AnimatePresence>
                             )}
@@ -556,6 +701,17 @@ export default function Dashboard() {
 
             <AnimatePresence>
                 {showLoginPopup && <LoginPopup onClose={() => setShowLoginPopup(false)} />}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {showPurchasePopup && (
+                    <PurchasePopup
+                        onClose={() => setShowPurchasePopup(false)}
+                        onPurchase={handlePurchaseAccess}
+                        price={dashboardPrice}
+                        purchasing={purchasing}
+                    />
+                )}
             </AnimatePresence>
         </div>
     );

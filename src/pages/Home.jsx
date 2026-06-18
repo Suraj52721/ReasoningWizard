@@ -131,7 +131,7 @@ export default function Home() {
         async function fetchHomeLeaderboard() {
             try {
                 const { data: attempts, error: attErr } = await supabase
-                    .from('quiz_attempts')
+                    .from('public_quiz_attempts')
                     .select('score, total_questions, time_taken_seconds, user_id')
                     .order('score', { ascending: false })
                     .order('time_taken_seconds', { ascending: true })
@@ -142,7 +142,7 @@ export default function Home() {
 
                 const userIds = [...new Set(attempts.map(a => a.user_id))];
                 const { data: profilesData, error: profErr } = await supabase
-                    .from('profiles')
+                    .from('public_profiles')
                     .select('id, display_name')
                     .in('id', userIds);
 

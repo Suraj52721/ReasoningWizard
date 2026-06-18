@@ -57,6 +57,26 @@ serve(async (req) => {
       );
     }
 
+    // Service-role client (bypasses RLS). Created here so we can resolve the
+    // authoritative server-side price BEFORE creating the Razorpay order.
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // SECURITY: never trust the client-supplied amount for fixed-price products.
+    // For a dashboard purchase, the price is whatever the admin set in
+    // app_settings.dashboard_price_pence — resolve it server-side and override.
+    let orderAmount = amount;
+    if (type === "dashboard_purchase") {
+      const { data: priceRow } = await supabaseAdmin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "dashboard_price_pence")
+        .maybeSingle();
+      orderAmount = priceRow?.value ? parseInt(priceRow.value, 10) : 999;
+    }
+
     const credentials = btoa(`${keyId}:${keySecret}`);
 
     const orderRes = await fetch("https://api.razorpay.com/v1/orders", {
@@ -66,7 +86,7 @@ serve(async (req) => {
         "Authorization": `Basic ${credentials}`,
       },
       body: JSON.stringify({
-        amount,
+        amount: orderAmount,
         currency,
         receipt,
         notes: { type, user_id: user.id },
@@ -83,12 +103,6 @@ serve(async (req) => {
 
     const order = await orderRes.json();
 
-    // Insert pending record using service role key to bypass RLS
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
     if (type === "nvr_subscription") {
       const { error } = await supabaseAdmin.from("nvr_subscriptions").insert({
         user_id: user.id,
@@ -99,6 +113,15 @@ serve(async (req) => {
         status: "pending",
       });
       if (error) throw new Error(`DB Insert Error (nvr_subscriptions): ${error.message}`);
+    } else if (type === "dashboard_purchase") {
+      const { error } = await supabaseAdmin.from("dashboard_purchases").insert({
+        user_id: user.id,
+        razorpay_order_id: order.id,
+        amount_pence: orderAmount,
+        currency,
+        status: "pending",
+      });
+      if (error) throw new Error(`DB Insert Error (dashboard_purchases): ${error.message}`);
     } else if (type === "bundle_purchase" && paper_ids && Array.isArray(paper_ids)) {
       const { data: papers, error: fetchErr } = await supabaseAdmin.from("premium_test_papers").select("id, price_pence").in("id", paper_ids);
       if (fetchErr) throw new Error(`Fetch Error: ${fetchErr.message}`);

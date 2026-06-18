@@ -107,3 +107,24 @@
         font-size: 1.5rem;
     }
 }
+
+/* Locked worksheet (older than the free 5-day window) */
+.worksheet-locked {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+}
+
+.worksheet-locked-text {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.worksheet-locked-text svg {
+    color: var(--primary);
+    flex-shrink: 0;
+}

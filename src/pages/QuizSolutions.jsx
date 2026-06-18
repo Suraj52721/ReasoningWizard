@@ -82,6 +82,23 @@ export default function QuizSolutions() {
         );
     }
 
+    if (questions.length === 0) {
+        return (
+            <div className="quiz-page page-container">
+                <div className="quiz-inner" style={{ textAlign: 'center', paddingTop: '4rem' }}>
+                    <p style={{ color: 'var(--text-muted)' }}>
+                        These solutions are locked. Only the latest 5 days are free — purchase dashboard access to unlock past quizzes.
+                    </p>
+                    <Link to="/dashboard">
+                        <motion.button className="btn-primary" style={{ marginTop: '1rem' }} whileHover={{ scale: 1.03 }}>
+                            Go to Dashboard
+                        </motion.button>
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
     const answers = typeof attempt.answers === 'string' ? JSON.parse(attempt.answers) : (attempt.answers || []);
     const correctCount = answers.filter(a => a?.correct).length;
     const wrongCount = answers.filter(a => a && !a.correct && a.selected !== -1).length;
