@@ -62,6 +62,48 @@ function LoginPopup({ onClose }) {
 }
 
 function PurchasePopup({ onClose, onPurchase, price, purchasing }) {
+    const [couponInput, setCouponInput] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const [couponError, setCouponError] = useState('');
+    const [couponLoading, setCouponLoading] = useState(false);
+
+    const discount = !appliedCoupon
+        ? 0
+        : appliedCoupon.discount_type === 'percentage'
+            ? Math.round(price * appliedCoupon.discount_value / 100)
+            : Math.min(appliedCoupon.discount_value, price);
+    const total = Math.max(price - discount, 0);
+
+    async function applyCoupon() {
+        if (!couponInput.trim()) return;
+        setCouponLoading(true);
+        setCouponError('');
+        setAppliedCoupon(null);
+        try {
+            const { data, error } = await supabase
+                .from('coupon_codes')
+                .select('*')
+                .eq('code', couponInput.trim().toUpperCase())
+                .eq('is_active', true)
+                .single();
+            if (error || !data) { setCouponError('Invalid coupon code.'); return; }
+            // Daily-worksheet cart only accepts 'dashboard' or 'all' coupons.
+            if ((data.applies_to || 'all') !== 'all' && data.applies_to !== 'dashboard') {
+                setCouponError('This coupon is not valid for daily worksheet access.'); return;
+            }
+            if (data.expires_at && new Date(data.expires_at) < new Date()) { setCouponError('This coupon has expired.'); return; }
+            if (data.max_uses && data.current_uses >= data.max_uses) { setCouponError('This coupon has reached its usage limit.'); return; }
+            if (data.min_cart_pence && price < data.min_cart_pence) {
+                setCouponError(`Minimum spend: £${(data.min_cart_pence / 100).toFixed(2)}.`); return;
+            }
+            setAppliedCoupon(data);
+        } catch {
+            setCouponError('Failed to validate coupon.');
+        } finally {
+            setCouponLoading(false);
+        }
+    }
+
     return (
         <motion.div
             className="login-popup-overlay"
@@ -85,23 +127,74 @@ function PurchasePopup({ onClose, onPurchase, price, purchasing }) {
                 <div className="purchase-popup-badge">
                     <FiLock />
                 </div>
-                <h2 className="popup-title">Unlock Unlimited Access</h2>
-                <p className="popup-desc">
-                    Get <strong>1 year</strong> of unlimited access to <strong>all past quizzes &amp; worksheets</strong> — including everything older than 5 days.
-                </p>
-                <div className="purchase-popup-price">
-                    <span className="purchase-price-amount">£{(price / 100).toFixed(2)}</span>
-                    <span className="purchase-price-period">/ 1 year</span>
+                <h2 className="popup-title">Your Cart</h2>
+
+                <div className="dash-cart-item">
+                    <div className="dash-cart-item-info">
+                        <strong>Daily Worksheet Access</strong>
+                        <span>1 year · all quizzes &amp; worksheets</span>
+                    </div>
+                    <span className="dash-cart-item-price">£{(price / 100).toFixed(2)}</span>
                 </div>
+
+                <div className="dash-cart-coupon">
+                    {appliedCoupon ? (
+                        <div className="dash-coupon-applied">
+                            <span>
+                                <strong>{appliedCoupon.code}</strong> applied
+                                {appliedCoupon.discount_type === 'percentage'
+                                    ? ` (−${appliedCoupon.discount_value}%)`
+                                    : ` (−£${(appliedCoupon.discount_value / 100).toFixed(2)})`}
+                            </span>
+                            <button
+                                type="button"
+                                className="dash-coupon-remove"
+                                onClick={() => { setAppliedCoupon(null); setCouponInput(''); setCouponError(''); }}
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="dash-coupon-row">
+                            <input
+                                className="admin-input"
+                                type="text"
+                                placeholder="Coupon code"
+                                value={couponInput}
+                                onChange={e => setCouponInput(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') applyCoupon(); }}
+                            />
+                            <button type="button" className="btn-secondary" onClick={applyCoupon} disabled={couponLoading}>
+                                {couponLoading ? '…' : 'Apply'}
+                            </button>
+                        </div>
+                    )}
+                    {couponError && <p className="dash-coupon-error">{couponError}</p>}
+                </div>
+
+                <div className="dash-cart-totals">
+                    <div className="dash-cart-line">
+                        <span>Subtotal</span><span>£{(price / 100).toFixed(2)}</span>
+                    </div>
+                    {discount > 0 && (
+                        <div className="dash-cart-line dash-cart-discount">
+                            <span>Discount</span><span>−£{(discount / 100).toFixed(2)}</span>
+                        </div>
+                    )}
+                    <div className="dash-cart-line dash-cart-total">
+                        <span>Total</span><span>£{(total / 100).toFixed(2)}</span>
+                    </div>
+                </div>
+
                 <div className="popup-actions">
                     <motion.button
                         className="btn-primary popup-btn"
                         whileHover={{ scale: 1.03 }}
                         whileTap={{ scale: 0.97 }}
-                        onClick={onPurchase}
+                        onClick={() => onPurchase(appliedCoupon)}
                         disabled={purchasing}
                     >
-                        <FiLock /> {purchasing ? 'Processing...' : 'Purchase Now'}
+                        <FiLock /> {purchasing ? 'Processing...' : `Proceed to Pay £${(total / 100).toFixed(2)}`}
                     </motion.button>
                 </div>
                 <p className="popup-footer">Secure checkout · 1 year access · Cancel anytime</p>
@@ -270,34 +363,53 @@ export default function Dashboard() {
     const getSession = (quizId) => sessions.find(s => s.quiz_id === quizId);
     const getWorksheet = (quiz) => worksheets.find(w => w.quiz_id === quiz.id);
 
-    const isQuizLocked = (dateStr) => {
+    // Only the first 3 dashboard quizzes (most recent — quizzes is ordered by
+    // quiz_date descending) stay unlocked. Everything else is locked behind the
+    // purchase for signed-in users without access.
+    const unlockedQuizIds = useMemo(
+        () => new Set(quizzes.slice(0, 3).map(q => q.id)),
+        [quizzes]
+    );
+
+    const isQuizLocked = (quizId) => {
         // Logged-out visitors never see the locked/purchase state. Their tiles
         // look normal and clicking prompts the sign-in / create-account popup.
         // The purchase lock only applies to signed-in users without access.
         if (!user) return false;
         if (hasDashboardAccess) return false;
-        if (!dateStr) return false;
-        const quizDate = new Date(dateStr + 'T00:00:00');
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Normalize today to midnight
-        const diffDays = (today - quizDate) / (1000 * 60 * 60 * 24);
-        // Only the most recent 5 days (today + previous 4) stay unlocked.
-        // Anything older than that locks automatically as days pass.
-        return diffDays >= 5;
+        return !unlockedQuizIds.has(quizId);
     };
 
-    const handlePurchaseAccess = async () => {
+    // Records a worksheet download. The DB trigger trg_sync_download_count then
+    // increments daily_worksheets.download_count, which the admin Manage Quizzes
+    // tab reads. Awaited + error-logged so a failed insert is visible in console
+    // instead of silently dropped.
+    const logWorksheetDownload = async (worksheetId) => {
+        try {
+            const { error } = await supabase
+                .from('download_logs')
+                .insert({ resource_type: 'worksheet', resource_id: worksheetId });
+            if (error) console.error('[download_logs] insert failed:', error.message);
+        } catch (e) {
+            console.error('[download_logs] insert threw:', e);
+        }
+    };
+
+    const handlePurchaseAccess = async (coupon) => {
         if (!user) {
             setShowLoginPopup(true);
             return;
         }
         setPurchasing(true);
         try {
+            // The server validates the coupon and computes the real charged
+            // amount from app_settings — the client amount here is only a hint.
             const { order_id, amount, currency } = await createRazorpayOrder({
                 amount: dashboardPrice,
                 currency: 'GBP',
                 receipt: `receipt_dash_${Date.now()}`,
-                type: 'dashboard_purchase'
+                type: 'dashboard_purchase',
+                coupon_code: coupon?.code || null
             });
 
             openRazorpayCheckout({
@@ -317,6 +429,12 @@ export default function Dashboard() {
                         razorpay_signature: response.razorpay_signature,
                         type: 'dashboard_purchase'
                     });
+                    // Count the coupon redemption (best-effort).
+                    if (coupon?.id) {
+                        await supabase.from('coupon_codes')
+                            .update({ current_uses: (coupon.current_uses || 0) + 1 })
+                            .eq('id', coupon.id);
+                    }
                     setHasDashboardAccess(true);
                     setShowPurchasePopup(false);
                     alert("Dashboard Access Unlocked Successfully!");
@@ -356,7 +474,7 @@ export default function Dashboard() {
         const attempt = getAttempt(quiz.id);
         const session = getSession(quiz.id);
         const worksheet = getWorksheet(quiz);
-        const locked = isQuizLocked(quiz.quiz_date);
+        const locked = isQuizLocked(quiz.id);
 
         return (
             <motion.div key={quiz.id} className={`quiz-card glass-card ${attempt ? 'completed' : ''} ${locked ? 'locked' : ''}`} variants={fadeUp} custom={i} whileHover={locked ? {} : { y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
@@ -413,7 +531,7 @@ export default function Dashboard() {
                         )}
                         {worksheet && (
                             user ? (
-                                <a href={worksheet.file_url} download={worksheet.file_name} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: '0.5rem' }} onClick={() => supabase.from('download_logs').insert({ resource_type: 'worksheet', resource_id: worksheet.id })}>
+                                <a href={worksheet.file_url} download={worksheet.file_name} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: '0.5rem' }} onClick={() => logWorksheetDownload(worksheet.id)}>
                                     <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" whileHover={{ scale: 1.02 }}>
                                         <FiDownload /> Download Worksheet
                                     </motion.button>

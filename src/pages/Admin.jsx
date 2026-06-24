@@ -191,12 +191,14 @@ export default function Admin() {
         const totalRevenue = successfulPurchases.reduce((sum, purchase) => sum + (Number(purchase.amount_pence) || 0), 0);
         const nvrSubscriptions = successfulPurchases.filter(purchase => purchase.type === 'nvr_subscription').length;
         const paperPurchases = successfulPurchases.filter(purchase => purchase.type === 'paper_purchase').length;
+        const dashboardPurchases = successfulPurchases.filter(purchase => purchase.type === 'dashboard_purchase').length;
         const activePayments = successfulPurchases.length;
 
         return {
             totalPurchases: successfulPurchases.length,
             nvrSubscriptions,
             paperPurchases,
+            dashboardPurchases,
             activePayments,
             totalRevenue,
         };
@@ -222,6 +224,7 @@ export default function Admin() {
     const [loadingCoupons, setLoadingCoupons] = useState(false);
     const [couponCode, setCouponCode] = useState('');
     const [couponType, setCouponType] = useState('percentage');
+    const [couponScope, setCouponScope] = useState('all');
     const [couponValue, setCouponValue] = useState('');
     const [couponMaxUses, setCouponMaxUses] = useState('');
     const [couponMinCart, setCouponMinCart] = useState('');
@@ -254,6 +257,7 @@ export default function Admin() {
     }, []);
 
     useEffect(() => {
+        if (tab === 'manage') { fetchQuizzes(); fetchWorksheets(); }
         if (tab === 'visitors') fetchVisitors();
         if (tab === 'pastpapers') { fetchPastPapers(); fetchAnswerRequestCounts(); }
         if (tab === 'reports') fetchReports();
@@ -274,15 +278,17 @@ export default function Admin() {
     async function fetchPurchases() {
         setLoadingPurchases(true);
         try {
-            // Fetch NVR and paper purchases
-            const [nvrRes, paperRes] = await Promise.all([
+            // Fetch NVR, paper and dashboard purchases
+            const [nvrRes, paperRes, dashboardRes] = await Promise.all([
                 supabase.from('nvr_subscriptions').select('*').order('created_at', { ascending: false }),
-                supabase.from('paper_purchases').select('*, papers:premium_test_papers(title)').order('created_at', { ascending: false })
+                supabase.from('paper_purchases').select('*, papers:premium_test_papers(title)').order('created_at', { ascending: false }),
+                supabase.from('dashboard_purchases').select('*').order('created_at', { ascending: false })
             ]);
 
             const allPurchases = [
                 ...(nvrRes.data || []).map(p => ({ ...p, type: 'nvr_subscription', itemName: 'NVR Subscription' })),
-                ...(paperRes.data || []).map(p => ({ ...p, type: 'paper_purchase', itemName: p.papers?.title || 'Single Paper' }))
+                ...(paperRes.data || []).map(p => ({ ...p, type: 'paper_purchase', itemName: p.papers?.title || 'Single Paper' })),
+                ...(dashboardRes.data || []).map(p => ({ ...p, type: 'dashboard_purchase', itemName: 'Dashboard Access' }))
             ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
             // Fetch profiles for the users in these purchases
@@ -310,21 +316,26 @@ export default function Admin() {
 
     async function fetchQuizzes() {
         setLoadingQuizzes(true);
+        // Fetch all quizzes (no row cap) — Manage Quizzes must list every quiz.
+        // Premium quizzes are excluded from the Dashboard-mode list downstream
+        // via `dashboardQuizzes` (resolveQuizScope), so no server filter here.
         const { data } = await supabase
             .from('quizzes')
             .select('*, questions(count), quiz_mode')
-            .order('quiz_date', { ascending: false })
-            .limit(50);
+            .order('quiz_date', { ascending: false });
         setQuizzes(data || []);
         setLoadingQuizzes(false);
     }
 
     async function fetchWorksheets() {
+        // download_count is kept up to date by the DB trigger trg_sync_download_count,
+        // which fires on every download_logs insert (each worksheet download logs one
+        // row). Read it straight from daily_worksheets — no row cap so every worksheet
+        // is included and its count can be matched to a quiz in Manage Quizzes.
         const { data } = await supabase
             .from('daily_worksheets')
             .select('id, quiz_id, title, subject, worksheet_date, file_url, file_name, file_path, download_count')
-            .order('worksheet_date', { ascending: false })
-            .limit(200);
+            .order('worksheet_date', { ascending: false });
         setWorksheets(data || []);
     }
 
@@ -441,10 +452,23 @@ export default function Admin() {
                 profiles = profilesWithEmail.data || [];
             }
 
-            // Get quiz attempts grouped by user
-            const { data: attempts } = await supabase
-                .from('quiz_attempts')
-                .select('user_id, score, total_questions');
+            // Get quiz attempts grouped by user. Read from the public_quiz_attempts
+            // view (scores without answers, readable by any authenticated user) so
+            // the count is correct even if the admin's is_admin RLS check doesn't
+            // resolve — the base quiz_attempts table would otherwise return only
+            // the admin's own rows and every student would show a stuck/zero count.
+            // Paginate to bypass the default 1000-row response cap.
+            const attempts = [];
+            const ATTEMPTS_PAGE = 1000;
+            for (let from = 0; ; from += ATTEMPTS_PAGE) {
+                const { data: page, error: attErr } = await supabase
+                    .from('public_quiz_attempts')
+                    .select('user_id, score, total_questions')
+                    .range(from, from + ATTEMPTS_PAGE - 1);
+                if (attErr || !page || page.length === 0) break;
+                attempts.push(...page);
+                if (page.length < ATTEMPTS_PAGE) break;
+            }
 
             // Fetch missing emails from a secure admin edge function backed by auth.admin API.
             const studentIdsWithoutEmail = profiles
@@ -545,6 +569,7 @@ export default function Admin() {
                 code: couponCode.trim().toUpperCase(),
                 discount_type: couponType,
                 discount_value: parseInt(couponValue),
+                applies_to: couponScope,
                 max_uses: couponMaxUses ? parseInt(couponMaxUses) : null,
                 min_cart_pence: couponMinCart ? parseInt(couponMinCart) : 0,
                 expires_at: couponExpiry || null,
@@ -552,7 +577,7 @@ export default function Admin() {
             });
             if (error) throw error;
             setMessage({ type: 'success', text: `Coupon "${couponCode.trim().toUpperCase()}" created!` });
-            setCouponCode(''); setCouponValue(''); setCouponMaxUses(''); setCouponMinCart(''); setCouponExpiry('');
+            setCouponCode(''); setCouponValue(''); setCouponMaxUses(''); setCouponMinCart(''); setCouponExpiry(''); setCouponScope('all');
             fetchCoupons();
         } catch (err) {
             setMessage({ type: 'error', text: `Failed: ${err.message}` });
@@ -1918,16 +1943,19 @@ Exp: 5 times 5 equals 25.`}
                                                                 <span className="manage-badge">{quiz.subject}</span>
                                                                 {quiz.is_draft && <span className="manage-badge" style={{ background: 'rgba(255,165,0,0.1)', color: 'orange', borderColor: 'rgba(255,165,0,0.2)' }}>Draft</span>}
                                                                 {(() => {
-                                                                    const ws = worksheets.find(w => w.quiz_id === quiz.id); return ws ? (
+                                                                    const wsList = worksheets.filter(w => w.quiz_id === quiz.id);
+                                                                    if (wsList.length === 0) return null;
+                                                                    const totalDownloads = wsList.reduce((sum, w) => sum + (w.download_count || 0), 0);
+                                                                    return (
                                                                         <>
                                                                             <span className="manage-badge" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.2)' }}>
                                                                                 <FiFileText /> Worksheet
                                                                             </span>
-                                                                            <span className="manage-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.25)' }} title="Worksheet downloads">
-                                                                                ↓ {ws.download_count ?? 0}
+                                                                            <span className="manage-badge" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.25)' }} title="Total worksheet downloads">
+                                                                                ↓ {totalDownloads}
                                                                             </span>
                                                                         </>
-                                                                    ) : null;
+                                                                    );
                                                                 })()}
                                                                 <span><FiCalendar /> {quiz.quiz_date}</span>
                                                                 <span><FiClock /> {quiz.duration_minutes} min</span>
@@ -2916,6 +2944,11 @@ Exp: 5 times 5 equals 25.`}
                                                 <small>Single paper transactions</small>
                                             </div>
                                             <div className="purchase-summary-card glass-card">
+                                                <span className="purchase-summary-label">Dashboard purchases</span>
+                                                <strong>{purchaseSummary.dashboardPurchases}</strong>
+                                                <small>Dashboard access transactions</small>
+                                            </div>
+                                            <div className="purchase-summary-card glass-card">
                                                 <span className="purchase-summary-label">Revenue</span>
                                                 <strong>£{(purchaseSummary.totalRevenue / 100).toFixed(2)}</strong>
                                                 <small>{purchaseSummary.activePayments} completed payments</small>
@@ -2974,7 +3007,7 @@ Exp: 5 times 5 equals 25.`}
                                         <div className="section-header">
                                             <div>
                                                 <h2><FiTag /> Coupon Codes</h2>
-                                                <p className="subtitle">Create and manage coupon codes for test paper purchases.</p>
+                                                <p className="subtitle">Create and manage coupon codes for test paper and daily worksheet purchases.</p>
                                             </div>
                                             <div className="section-header-pill">{coupons.length} coupons</div>
                                         </div>
@@ -2991,6 +3024,14 @@ Exp: 5 times 5 equals 25.`}
                                                     <select className="admin-input" value={couponType} onChange={e => setCouponType(e.target.value)}>
                                                         <option value="percentage">Percentage (%)</option>
                                                         <option value="fixed">Fixed (pence)</option>
+                                                    </select>
+                                                </div>
+                                                <div className="form-field coupon-field">
+                                                    <label>Applies To</label>
+                                                    <select className="admin-input" value={couponScope} onChange={e => setCouponScope(e.target.value)}>
+                                                        <option value="all">All purchases</option>
+                                                        <option value="dashboard">Daily Worksheet only</option>
+                                                        <option value="test_papers">Test Papers only</option>
                                                     </select>
                                                 </div>
                                                 <div className="form-field coupon-field">
@@ -3026,6 +3067,7 @@ Exp: 5 times 5 equals 25.`}
                                                         <tr>
                                                             <th>Code</th>
                                                             <th>Discount</th>
+                                                            <th>Applies To</th>
                                                             <th>Uses</th>
                                                             <th>Min Cart</th>
                                                             <th>Expires</th>
@@ -3038,6 +3080,7 @@ Exp: 5 times 5 equals 25.`}
                                                             <tr key={c.id}>
                                                                 <td><strong>{c.code}</strong></td>
                                                                 <td>{c.discount_type === 'percentage' ? `${c.discount_value}%` : `£${(c.discount_value / 100).toFixed(2)}`}</td>
+                                                                <td>{c.applies_to === 'dashboard' ? 'Daily Worksheet' : c.applies_to === 'test_papers' ? 'Test Papers' : 'All'}</td>
                                                                 <td>{c.current_uses}{c.max_uses ? ` / ${c.max_uses}` : ' / ∞'}</td>
                                                                 <td>{c.min_cart_pence > 0 ? `£${(c.min_cart_pence / 100).toFixed(2)}` : '—'}</td>
                                                                 <td>{c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'Never'}</td>
@@ -3062,7 +3105,7 @@ Exp: 5 times 5 equals 25.`}
                                                         ))}
                                                         {coupons.length === 0 && (
                                                             <tr>
-                                                                <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>No coupons created yet.</td>
+                                                                <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>No coupons created yet.</td>
                                                             </tr>
                                                         )}
                                                     </tbody>

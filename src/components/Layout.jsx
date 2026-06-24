@@ -6,6 +6,7 @@ import Footer from './Footer';
 import CookieConsent from './CookieConsent';
 import ChatWidget from './ChatWidget';
 import AbandonedCartPopup from './AbandonedCartPopup';
+import TestPaperPromoPopup from './TestPaperPromoPopup';
 import { useAuth } from '../context/AuthContext';
 import { trackVisit, resetTrackingFlag } from '../utils/visitorTracker';
 
@@ -55,6 +56,7 @@ export default function Layout({ children }) {
             {/* Floating Chat Widget */}
             {!quizFocus && <ChatWidget />}
             {!quizFocus && <AbandonedCartPopup />}
+            {!quizFocus && <TestPaperPromoPopup />}
         </>
     );
 }

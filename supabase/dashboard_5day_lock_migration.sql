@@ -6,13 +6,13 @@
 --   1. Ensures app_settings exists (holds the dashboard tile price).
 --   2. Ensures dashboard_purchases exists (1-year unlock records).
 --   3. Seeds the default dashboard price (£9.99).
---   4. (Optional hardening) Enforces the "only the last 5 days are free,
+--   4. (Optional hardening) Enforces the "only the last 3 days are free,
 --      everything older needs a purchase" rule on the SERVER, so it can't
 --      be bypassed by calling the API directly. Scoped to DASHBOARD quizzes
 --      only, so premium / subscription quizzes are never affected.
 --
--- NOTE: The 5-day window is also enforced client-side in Dashboard.jsx
---       (isQuizLocked -> diffDays >= 5). Section 4 below makes that
+-- NOTE: The 3-day window is also enforced client-side in Dashboard.jsx
+--       (isQuizLocked -> diffDays >= 3). Section 4 below makes that
 --       authoritative on the database. If you only want the data layer,
 --       run sections 1-3 and skip section 4.
 -- =====================================================================

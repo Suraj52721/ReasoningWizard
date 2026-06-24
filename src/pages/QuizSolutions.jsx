@@ -87,7 +87,7 @@ export default function QuizSolutions() {
             <div className="quiz-page page-container">
                 <div className="quiz-inner" style={{ textAlign: 'center', paddingTop: '4rem' }}>
                     <p style={{ color: 'var(--text-muted)' }}>
-                        These solutions are locked. Only the latest 5 days are free — purchase dashboard access to unlock past quizzes.
+                        These solutions are locked. Only the latest 3 days are free — purchase dashboard access to unlock past quizzes.
                     </p>
                     <Link to="/dashboard">
                         <motion.button className="btn-primary" style={{ marginTop: '1rem' }} whileHover={{ scale: 1.03 }}>

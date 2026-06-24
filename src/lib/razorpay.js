@@ -168,12 +168,12 @@ export function loadRazorpayScript() {
 /**
  * Calls the Supabase Edge Function to create a Razorpay order.
  */
-export async function createRazorpayOrder({ amount, currency = 'INR', receipt, type, bundle_id, paper_id, paper_ids }) {
+export async function createRazorpayOrder({ amount, currency = 'INR', receipt, type, bundle_id, paper_id, paper_ids, coupon_code }) {
   if (!amount || amount <= 0) throw new Error('Invalid payment amount.');
   if (!receipt) throw new Error('Missing payment receipt identifier.');
   if (!type) throw new Error('Missing payment type.');
 
-  return callEdgeFunction('create-razorpay-order', { amount, currency, receipt, type, bundle_id, paper_id, paper_ids });
+  return callEdgeFunction('create-razorpay-order', { amount, currency, receipt, type, bundle_id, paper_id, paper_ids, coupon_code });
 }
 
 /**

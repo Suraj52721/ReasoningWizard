@@ -21,7 +21,8 @@ import SEO from '../components/SEO';
 import PaperThumbnail from '../components/PaperThumbnail';
 import './TestPapers.css';
 
-const SUBJECTS = ['11+ Maths', '11+ NVR', '11+ English'];
+// Only 11+ NVR is currently offered; Maths and English are hidden for now.
+const SUBJECTS = ['11+ NVR'];
 const CART_STORAGE_KEY = 'rw_test_papers_cart';
 
 const DEFAULT_CURRENCY = 'GBP';
@@ -34,7 +35,7 @@ export default function TestPapers() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [activeSubject, setActiveSubject] = useState('11+ Maths');
+  const [activeSubject, setActiveSubject] = useState('11+ NVR');
   const [papers, setPapers] = useState({});
   const [bundles, setBundles] = useState({});
   // paperPurchases: Set of individual paper IDs bought
@@ -188,6 +189,7 @@ export default function TestPapers() {
         .eq('is_active', true)
         .single();
       if (error || !data) { setBundleCouponError('Invalid coupon code.'); return; }
+      if ((data.applies_to || 'all') !== 'all' && data.applies_to !== 'test_papers') { setBundleCouponError('This coupon is not valid for test papers.'); return; }
       if (data.expires_at && new Date(data.expires_at) < new Date()) { setBundleCouponError('This coupon has expired.'); return; }
       if (data.max_uses && data.current_uses >= data.max_uses) { setBundleCouponError('This coupon has reached its usage limit.'); return; }
       setAppliedBundleCoupon(data);
@@ -441,6 +443,7 @@ export default function TestPapers() {
         .single();
 
       if (error || !data) { setCouponError('Invalid coupon code.'); return; }
+      if ((data.applies_to || 'all') !== 'all' && data.applies_to !== 'test_papers') { setCouponError('This coupon is not valid for test papers.'); return; }
       if (data.expires_at && new Date(data.expires_at) < new Date()) { setCouponError('This coupon has expired.'); return; }
       if (data.max_uses && data.current_uses >= data.max_uses) { setCouponError('This coupon has reached its usage limit.'); return; }
       const subtotal = getCartSubtotal();

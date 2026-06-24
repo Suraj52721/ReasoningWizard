@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabaseClient';
 import { FiClock, FiCheckCircle, FiTarget, FiPlay, FiPause, FiMaximize, FiMinimize, FiArrowLeft, FiAlertCircle, FiCheck, FiX, FiTrendingUp, FiAward, FiBarChart2, FiPercent, FiShare2, FiRefreshCw, FiHome, FiEye, FiChevronLeft, FiChevronRight, FiFlag } from 'react-icons/fi';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import SEO from '../components/SEO';
+import TestPaperPromoPopup from '../components/TestPaperPromoPopup';
 import './Quiz.css';
 
 const fadeUp = {
@@ -37,6 +38,7 @@ export default function Quiz() {
     const [topperScore, setTopperScore] = useState(0);
     const [showSolutions, setShowSolutions] = useState(false);
     const [expandedSolutions, setExpandedSolutions] = useState({});
+    const [showNvrPromo, setShowNvrPromo] = useState(false);
     const timerRef = useRef(null);
     const [sessionId, setSessionId] = useState(null);
     const [isResuming, setIsResuming] = useState(false);
@@ -129,7 +131,7 @@ export default function Quiz() {
         // older than the free 5-day window) or unavailable. Don't render an empty
         // quiz — direct the user to unlock it.
         if (!questionsData || questionsData.length === 0) {
-            setError('This quiz is locked. Only the latest 5 days are free — purchase dashboard access to unlock past quizzes.');
+            setError('This quiz is locked. Only the latest 3 days are free — purchase dashboard access to unlock past quizzes.');
             setPhase('error');
             return;
         }
@@ -329,6 +331,14 @@ export default function Quiz() {
         }
 
     }, [answers, questions, quiz, timeLeft, user.id, id]);
+
+    // After the user lands on the results screen, promote the 11+ NVR test
+    // papers — a high-intent moment to convert practice into a purchase.
+    useEffect(() => {
+        if (phase !== 'submitted') return;
+        const timer = setTimeout(() => setShowNvrPromo(true), 2500);
+        return () => clearTimeout(timer);
+    }, [phase]);
 
     // Timer (respects pause)
     useEffect(() => {
@@ -547,6 +557,11 @@ export default function Quiz() {
         return (
             <div className="quiz-page page-container">
                 <SEO title={`Results: ${quiz?.title} `} />
+                <TestPaperPromoPopup
+                    variant="post-quiz"
+                    open={showNvrPromo}
+                    onClose={() => setShowNvrPromo(false)}
+                />
                 <div className="quiz-inner result-page">
                     {/* Confetti */}
                     {percentage >= 70 && (

@@ -38,6 +38,7 @@ export default function Navbar() {
         { to: '/home', label: 'Home' },
         { to: '/about', label: 'About' },
         { to: '/past-papers', label: 'Past Papers' },
+        { to: '/test-papers', label: 'Test Papers' },
         { to: '/contact', label: 'Contact' },
         ...(user ? [{ to: '/dashboard', label: 'Dashboard' }] : []),
         ...(profile?.is_admin ? [{ to: '/admin', label: 'Admin' }] : []),

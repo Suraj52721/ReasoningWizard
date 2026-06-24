@@ -97,7 +97,7 @@ export default function DailyWorksheet() {
                                 {worksheet.is_locked ? (
                                     <div className="worksheet-actions worksheet-locked">
                                         <p className="worksheet-locked-text">
-                                            <FiLock /> Locked — only the latest 5 days are free.
+                                            <FiLock /> Locked — only the latest 3 days are free.
                                         </p>
                                         <Link to="/dashboard" className="btn-primary worksheet-btn">
                                             <FiLock /> Unlock with Dashboard access

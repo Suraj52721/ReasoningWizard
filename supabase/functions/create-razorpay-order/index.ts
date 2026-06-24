@@ -36,7 +36,7 @@ serve(async (req) => {
       });
     }
 
-    const { amount, currency = "GBP", receipt, type, bundle_id, paper_id, paper_ids } = await req.json();
+    const { amount, currency = "GBP", receipt, type, bundle_id, paper_id, paper_ids, coupon_code } = await req.json();
 
     if (!amount || !receipt || !type) {
       return new Response(JSON.stringify({ error: "Missing required fields: amount, receipt, type" }), {
@@ -67,6 +67,8 @@ serve(async (req) => {
     // SECURITY: never trust the client-supplied amount for fixed-price products.
     // For a dashboard purchase, the price is whatever the admin set in
     // app_settings.dashboard_price_pence — resolve it server-side and override.
+    // A coupon discount (if any) is also validated and applied here so the
+    // discount cannot be forged client-side.
     let orderAmount = amount;
     if (type === "dashboard_purchase") {
       const { data: priceRow } = await supabaseAdmin
@@ -74,7 +76,50 @@ serve(async (req) => {
         .select("value")
         .eq("key", "dashboard_price_pence")
         .maybeSingle();
-      orderAmount = priceRow?.value ? parseInt(priceRow.value, 10) : 999;
+      const basePrice = priceRow?.value ? parseInt(priceRow.value, 10) : 999;
+      orderAmount = basePrice;
+
+      if (coupon_code) {
+        const code = String(coupon_code).trim().toUpperCase();
+        const { data: coupon } = await supabaseAdmin
+          .from("coupon_codes")
+          .select("*")
+          .eq("code", code)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        const fail = (msg: string) =>
+          new Response(JSON.stringify({ error: msg }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+
+        if (!coupon) return fail("Invalid coupon code.");
+        // Daily-worksheet purchases only accept 'dashboard' or 'all' coupons.
+        const scope = coupon.applies_to || "all";
+        if (scope !== "all" && scope !== "dashboard") {
+          return fail("This coupon is not valid for daily worksheet access.");
+        }
+        if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+          return fail("This coupon has expired.");
+        }
+        if (coupon.max_uses != null && coupon.current_uses >= coupon.max_uses) {
+          return fail("This coupon has reached its usage limit.");
+        }
+        if (coupon.min_cart_pence && basePrice < coupon.min_cart_pence) {
+          return fail("This purchase does not meet the coupon's minimum spend.");
+        }
+
+        const discount = coupon.discount_type === "percentage"
+          ? Math.round(basePrice * coupon.discount_value / 100)
+          : Math.min(coupon.discount_value, basePrice);
+        orderAmount = Math.max(basePrice - discount, 0);
+
+        // Razorpay cannot process a zero/near-zero charge.
+        if (orderAmount < 1) {
+          return fail("This coupon cannot be applied to this purchase.");
+        }
+      }
     }
 
     const credentials = btoa(`${keyId}:${keySecret}`);
