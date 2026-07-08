@@ -358,3 +358,61 @@ textarea {
     transform: rotate(360deg) scale(1);
   }
 }
+
+/* ── Reusable animated glowing gold border (for cards) ──────────────── */
+@property --rw-glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.rw-glow-border {
+  position: relative;
+  animation: rw-glow-pulse 2.6s ease-in-out infinite;
+}
+
+/* Moving yellow gradient border — masked so only the ring shows. */
+.rw-glow-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--rw-glow-angle),
+    rgba(245, 197, 24, 0) 0deg,
+    #f5c518 70deg,
+    #fff3b0 110deg,
+    #f5c518 150deg,
+    rgba(245, 197, 24, 0) 240deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: rw-glow-spin 3s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes rw-glow-spin {
+  to {
+    --rw-glow-angle: 360deg;
+  }
+}
+
+@keyframes rw-glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(245, 197, 24, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(245, 197, 24, 0.42);
+  }
+}
+
+/* Respect users who prefer no motion. */
+@media (prefers-reduced-motion: reduce) {
+  .rw-glow-border,
+  .rw-glow-border::before {
+    animation: none;
+  }
+}

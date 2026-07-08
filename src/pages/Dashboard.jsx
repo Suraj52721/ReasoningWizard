@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { FiCalendar, FiClock, FiPlay, FiUser, FiEdit2, FiSave, FiTrendingUp, FiAward, FiCheckCircle, FiBook, FiRefreshCw, FiDownload, FiX, FiLogIn, FiArrowRight, FiLock } from 'react-icons/fi';
 import logo from '../assets/logo.png';
-import { createRazorpayOrder, verifyRazorpayPayment, openRazorpayCheckout, loadRazorpayScript } from '../lib/razorpay';
+import { createRazorpayOrder, verifyRazorpayPayment, openRazorpayCheckout, loadRazorpayScript, reconcileRazorpayPayments } from '../lib/razorpay';
 import './Dashboard.css';
 import './Home.css';
 
@@ -247,6 +247,18 @@ export default function Dashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [authLoading, user?.id]);
 
+    // Self-heal any payment Razorpay charged but the client never confirmed
+    // (tab closed / network drop / expired token). Only completes orders that
+    // Razorpay reports as actually paid, then unlocks access if one was healed.
+    useEffect(() => {
+        if (authLoading || !user) return;
+        (async () => {
+            const res = await reconcileRazorpayPayments();
+            if (res?.healed?.dashboard > 0) setHasDashboardAccess(true);
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authLoading, user?.id]);
+
     useEffect(() => {
         if (profile) {
             setProfileForm({ display_name: profile.display_name || '', phone: profile.phone || '' });
@@ -477,7 +489,7 @@ export default function Dashboard() {
         const locked = isQuizLocked(quiz.id);
 
         return (
-            <motion.div key={quiz.id} className={`quiz-card glass-card ${attempt ? 'completed' : ''} ${locked ? 'locked' : ''}`} variants={fadeUp} custom={i} whileHover={locked ? {} : { y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
+            <motion.div key={quiz.id} className={`quiz-card glass-card rw-glow-border ${attempt ? 'completed' : ''} ${locked ? 'locked' : ''}`} variants={fadeUp} custom={i} whileHover={locked ? {} : { y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
                 <div className="quiz-card-header">
                     <div className="quiz-subject-badge">{quiz.subject}</div>
                     {locked ? (

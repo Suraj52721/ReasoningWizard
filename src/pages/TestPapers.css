@@ -214,6 +214,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  margin: 0.75rem 0;
 }
 
 .bundle-perks li {
@@ -229,12 +230,61 @@
   flex-shrink: 0;
 }
 
+@property --tp-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
 .bundle-pricing {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
   min-width: 220px;
   flex-shrink: 0;
+  padding: 1.35rem;
+  border-radius: 16px;
+  background: rgba(245, 197, 24, 0.05);
+  animation: tp-pricing-glow 2.6s ease-in-out infinite;
+}
+
+/* Moving yellow gradient border — masked so only the ring shows. */
+.bundle-pricing::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--tp-angle),
+    rgba(245, 197, 24, 0) 0deg,
+    #f5c518 70deg,
+    #fff3b0 110deg,
+    #f5c518 150deg,
+    rgba(245, 197, 24, 0) 240deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: tp-border-spin 3s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes tp-border-spin {
+  to {
+    --tp-angle: 360deg;
+  }
+}
+
+@keyframes tp-pricing-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(245, 197, 24, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(245, 197, 24, 0.5);
+  }
 }
 
 .bundle-name-row {

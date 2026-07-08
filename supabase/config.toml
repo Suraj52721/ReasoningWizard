@@ -150,6 +150,11 @@ verify_jwt = false
 [functions.verify-razorpay-payment]
 verify_jwt = false
 
+# Razorpay calls this server-to-server with no Supabase auth; authenticity is
+# enforced via the X-Razorpay-Signature HMAC inside the function.
+[functions.razorpay-webhook]
+verify_jwt = false
+
 # Vector Buckets is available to Supabase Pro plan.
 # [storage.vector.buckets.documents-openai]
 

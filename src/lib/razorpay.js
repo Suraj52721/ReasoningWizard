@@ -196,6 +196,21 @@ export async function verifyRazorpayPayment({ razorpay_order_id, razorpay_paymen
 }
 
 /**
+ * Self-heals payments that were charged by Razorpay but left "pending" because
+ * the client never completed verification (tab closed, network drop, expired
+ * token). Safe to call on page load — it only completes orders Razorpay reports
+ * as actually paid. Returns { success, healed: { dashboard, nvr, papers } }.
+ * Never throws (returns null on failure) so callers can fire-and-forget.
+ */
+export async function reconcileRazorpayPayments() {
+  try {
+    return await callEdgeFunction('reconcile-razorpay-payment', {});
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Marks a payment attempt as failed/cancelled when checkout does not complete.
  */
 export async function markRazorpayPaymentStatus({ razorpay_order_id, type, status }) {

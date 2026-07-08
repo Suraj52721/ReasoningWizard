@@ -9,6 +9,7 @@ import {
   verifyRazorpayPayment,
   markRazorpayPaymentStatus,
   openRazorpayCheckout,
+  reconcileRazorpayPayments,
 } from '../lib/razorpay';
 import { FiRefreshCw, FiEye } from 'react-icons/fi';
 import {
@@ -117,7 +118,11 @@ export default function TestPapers() {
     (bundlesRes.data || []).forEach((b) => { bundleMap[b.subject] = b; });
     setBundles(bundleMap);
 
-    if (user) await checkPurchases(bundlesRes.data || [], papersRes.data || []);
+    if (user) {
+      // Complete any charged-but-pending purchases before reading ownership.
+      await reconcileRazorpayPayments();
+      await checkPurchases(bundlesRes.data || [], papersRes.data || []);
+    }
     setLoading(false);
   }
 
@@ -642,17 +647,22 @@ export default function TestPapers() {
                 <motion.div className="tp-bundle-card glass-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                   <div className="bundle-info">
                     <div className="bundle-name-row">
-                      <h3 className="bundle-name">{currentBundle.name}</h3>
+                      <h3 className="bundle-name">🧩 11+ Non-Verbal Reasoning Practice Tests</h3>
                       {bundleDiscount > 0 && (
                         <span className="bundle-save-badge">Save {formatPrice(bundleDiscount)}</span>
                       )}
                     </div>
-                    <p className="bundle-desc">{currentBundle.description}</p>
+                    <p className="bundle-desc">Master every Non-Verbal Reasoning topic with our topic-wise solved practice tests, designed using past 11+ exam papers.</p>
                     <ul className="bundle-perks">
-                      <li><FiCheck /> All {premiumPapers.length + freePapers.length} papers in one purchase</li>
-                      <li><FiCheck /> Step-by-step solutions &amp; quizzes</li>
-                      <li><FiCheck /> Lifetime access</li>
+                      <li><FiCheck /> Instant access to all topic-wise practice tests</li>
+                      <li><FiCheck /> Level: Moderate to Advanced questions</li>
+                      <li><FiCheck /> Fully solved answers with explanations</li>
+                      <li><FiCheck /> Instant overall rank after every test</li>
+                      <li><FiCheck /> Identify your weak areas with detailed performance analysis</li>
+                      <li><FiCheck /> Practise weak topics and turn them into strengths</li>
+                      <li><FiCheck /> Based on past 11+ exam papers</li>
                     </ul>
+                    <p className="bundle-desc">Prepare smarter, track your progress, and boost your confidence for the 11+ exam with Reasoning Wizard.</p>
                   </div>
                   <div className="bundle-pricing">
                     <div className="bundle-price-row">
@@ -888,7 +898,7 @@ function TPCard({ paper, idx, accessible, paymentLoading, paymentError, onDownlo
   const navigate = useNavigate();
   return (
     <motion.div
-      className="paper-card glass-card"
+      className="paper-card glass-card rw-glow-border"
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: (idx % 10) * 0.05 }}
