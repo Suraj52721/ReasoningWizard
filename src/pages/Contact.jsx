@@ -17,7 +17,7 @@ export default function Contact() {
 
     const contactInfo = [
         { icon: <FiMail />, label: 'Email', value: 'support@reasoningwizard.com', href: 'mailto:support@reasoningwizard.com' },
-        { icon: <FiPhone />, label: 'Phone', value: '+919560103627', href: 'tel:+919560103627' },
+        { icon: <FiPhone />, label: 'Phone', value: '+917988145775', href: 'tel:+917988145775' },
         { icon: <FiFacebook />, label: 'Facebook', value: 'Reasoning Wizard', href: 'https://www.facebook.com/share/1DWaXgeZ1c/' },
         { icon: <FiMapPin />, label: 'Address', value: '1 Sheldon Square, London, W2 6TT, United Kingdom', href: null },
         { icon: <FiClock />, label: 'Hours', value: 'Mon–Fri, 9am–6pm GMT', href: null },

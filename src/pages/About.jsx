@@ -109,7 +109,7 @@ export default function About() {
                         "At <span className="text-gradient" style={{ fontStyle: 'normal', fontWeight: 'bold' }}>Reasoning Wizard</span>, we are driven by a singular vision: to make high-quality, effective learning accessible and affordable for every student."
                     </p>
                     <p style={{ margin: '1rem 0 0 0', fontSize: '1.1rem', color: 'var(--primary)' }}>
-                        — <strong>Ankur Yadav</strong>, Founder
+                        — <strong>Team Reasoning Wizard</strong>
                     </p>
                 </motion.section>
             </div>
