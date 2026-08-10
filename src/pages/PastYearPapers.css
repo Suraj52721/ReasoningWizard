@@ -302,6 +302,30 @@
     transform: translateY(-1px);
 }
 
+/* ── Solution button (outlined variant) ──────────────────── */
+.pyp-solution-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 1;
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+    background: transparent;
+    color: var(--diff-color, var(--primary));
+    border: 1.5px solid var(--diff-color, var(--primary));
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+
+.pyp-solution-btn:hover {
+    background: var(--diff-color, var(--primary));
+    color: #fff;
+    transform: translateY(-1px);
+}
+
 /* ── Request Answer button ───────────────────────────────── */
 .pyp-request-btn {
     display: flex;

@@ -297,6 +297,18 @@ export default function PastYearPapers() {
                                                         >
                                                             <FiDownload /> Download
                                                         </a>
+                                                        {paper.solution_file_url && (
+                                                            <a
+                                                                href={paper.solution_file_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="pyp-solution-btn"
+                                                                style={{ '--diff-color': cfg.color }}
+                                                                onClick={(e) => { e.stopPropagation(); if (!user) { e.preventDefault(); setShowLoginPopup(true); } }}
+                                                            >
+                                                                <FiFileText /> Solution
+                                                            </a>
+                                                        )}
                                                         <button
                                                             className={`pyp-request-btn ${requestedPapers.has(paper.id) ? 'requested' : ''}`}
                                                             onClick={(e) => { e.stopPropagation(); handleRequestAnswer(paper.id); }}

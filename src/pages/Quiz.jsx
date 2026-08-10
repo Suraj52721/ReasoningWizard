@@ -9,6 +9,62 @@ import SEO from '../components/SEO';
 import TestPaperPromoPopup from '../components/TestPaperPromoPopup';
 import './Quiz.css';
 
+// Celebratory reward popup shown after quiz submission when enabled by admin.
+function QuizRewardPopup({ open, config, onClose }) {
+    const [copied, setCopied] = useState(false);
+    if (!config) return null;
+    const code = (config.coupon_code || '').trim();
+    const copyCode = async () => {
+        try {
+            await navigator.clipboard.writeText(code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch { /* clipboard unavailable */ }
+    };
+    return (
+        <AnimatePresence>
+            {open && (
+                <motion.div className="reward-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+                    <div className="confetti-container">
+                        {Array.from({ length: 60 }).map((_, i) => (
+                            <motion.div
+                                key={i}
+                                className="confetti-piece"
+                                initial={{ y: -30, x: Math.random() * 900 - 450, opacity: 1, rotate: 0 }}
+                                animate={{ y: 720, opacity: 0, rotate: Math.random() * 720 }}
+                                transition={{ duration: 2.5 + Math.random() * 2, delay: Math.random() * 0.6, ease: 'easeOut', repeat: Infinity, repeatDelay: Math.random() * 1.2 }}
+                                style={{ background: ['#F5C518', '#FFD84D', '#D4A91A', '#00D68F', '#FF4D6A', '#7c5cff'][Math.floor(Math.random() * 6)] }}
+                            />
+                        ))}
+                    </div>
+                    <motion.div
+                        className="reward-card glass-card"
+                        initial={{ opacity: 0, scale: 0.8, y: 30 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.85, y: 20 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <button className="reward-close" onClick={onClose}><FiX /></button>
+                        <motion.div className="reward-emoji" animate={{ rotate: [0, -12, 12, -8, 8, 0], scale: [1, 1.15, 1] }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 1 }}>🎉</motion.div>
+                        <h2 className="reward-title">{config.title || 'Congratulations!'}</h2>
+                        {config.message && <p className="reward-message">{config.message}</p>}
+                        {code && (
+                            <div className="reward-coupon">
+                                <span className="reward-coupon-code">{code}</span>
+                                <button className="reward-coupon-copy" onClick={copyCode}>{copied ? 'Copied!' : 'Copy'}</button>
+                            </div>
+                        )}
+                        <Link to="/dashboard" className="reward-cta" onClick={onClose}>
+                            <FiHome /> Go to Dashboard
+                        </Link>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+}
+
 const fadeUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
@@ -39,6 +95,8 @@ export default function Quiz() {
     const [showSolutions, setShowSolutions] = useState(false);
     const [expandedSolutions, setExpandedSolutions] = useState({});
     const [showNvrPromo, setShowNvrPromo] = useState(false);
+    const [rewardConfig, setRewardConfig] = useState(null);
+    const [showReward, setShowReward] = useState(false);
     const timerRef = useRef(null);
     const [sessionId, setSessionId] = useState(null);
     const [isResuming, setIsResuming] = useState(false);
@@ -332,12 +390,32 @@ export default function Quiz() {
 
     }, [answers, questions, quiz, timeLeft, user.id, id]);
 
-    // After the user lands on the results screen, promote the 11+ NVR test
-    // papers — a high-intent moment to convert practice into a purchase.
+    // After the user lands on the results screen: if the admin has enabled the
+    // quiz reward popup, show the congratulations + coupon popup. Otherwise fall
+    // back to promoting the 11+ NVR test papers.
     useEffect(() => {
         if (phase !== 'submitted') return;
-        const timer = setTimeout(() => setShowNvrPromo(true), 2500);
-        return () => clearTimeout(timer);
+        let cancelled = false;
+        let promoTimer;
+        (async () => {
+            try {
+                const { data } = await supabase
+                    .from('app_settings')
+                    .select('value')
+                    .eq('key', 'quiz_reward_popup')
+                    .maybeSingle();
+                const cfg = data?.value ? JSON.parse(data.value) : null;
+                if (cancelled) return;
+                if (cfg?.enabled) {
+                    setRewardConfig(cfg);
+                    setShowReward(true);
+                    return; // reward popup takes priority over the NVR promo
+                }
+            } catch { /* ignore bad/missing config */ }
+            if (cancelled) return;
+            promoTimer = setTimeout(() => setShowNvrPromo(true), 2500);
+        })();
+        return () => { cancelled = true; if (promoTimer) clearTimeout(promoTimer); };
     }, [phase]);
 
     // Timer (respects pause)
@@ -561,6 +639,11 @@ export default function Quiz() {
                     variant="post-quiz"
                     open={showNvrPromo}
                     onClose={() => setShowNvrPromo(false)}
+                />
+                <QuizRewardPopup
+                    open={showReward}
+                    config={rewardConfig}
+                    onClose={() => setShowReward(false)}
                 />
                 <div className="quiz-inner result-page">
                     {/* Confetti */}

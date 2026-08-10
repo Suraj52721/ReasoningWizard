@@ -7,7 +7,7 @@ import {
     FiEdit2, FiCheck, FiAlertTriangle, FiFileText, FiEye, FiX, FiImage, FiUpload,
     FiUsers, FiGlobe, FiMonitor, FiSearch, FiChevronLeft, FiChevronRight,
     FiFilter, FiBarChart2, FiArrowUp, FiArrowDown, FiLock, FiSmartphone,
-    FiExternalLink, FiDollarSign, FiTag, FiUserCheck, FiMessageCircle, FiSend
+    FiExternalLink, FiDollarSign, FiTag, FiUserCheck, FiMessageCircle, FiSend, FiGift
 } from 'react-icons/fi';
 import { compressImage } from '../utils/imageCompressor';
 import './Admin.css';
@@ -213,6 +213,18 @@ export default function Admin() {
     const [ppDifficulty, setPpDifficulty] = useState('Medium');
     const [ppFile, setPpFile] = useState(null);
     const [ppSaving, setPpSaving] = useState(false);
+    // Per-paper solution PDF editing
+    const [solutionPaper, setSolutionPaper] = useState(null);
+    const [solutionFile, setSolutionFile] = useState(null);
+    const [solutionSaving, setSolutionSaving] = useState(false);
+
+    // Post-quiz reward popup config (stored in app_settings key 'quiz_reward_popup')
+    const [rewardEnabled, setRewardEnabled] = useState(false);
+    const [rewardTitle, setRewardTitle] = useState('Congratulations! 🎉');
+    const [rewardMessage, setRewardMessage] = useState('You have unlocked a coupon to access all quizzes on the dashboard!');
+    const [rewardCoupon, setRewardCoupon] = useState('');
+    const [rewardLoading, setRewardLoading] = useState(false);
+    const [rewardSaving, setRewardSaving] = useState(false);
 
     // Students tab
     const [students, setStudents] = useState([]);
@@ -265,6 +277,7 @@ export default function Admin() {
         if (tab === 'premium_papers') { fetchPremiumTestPapers(); fetchTestPaperBundles(); }
         if (tab === 'premium_purchases') { fetchPurchases(); fetchCoupons(); }
         if (tab === 'students') fetchStudents();
+        if (tab === 'quiz_reward') fetchRewardConfig();
         if (tab === 'chats') fetchChatThreads();
     }, [tab]);
 
@@ -384,10 +397,96 @@ export default function Admin() {
 
     async function deletePastPaper(paper) {
         if (!window.confirm(`Delete "${paper.title}"? This cannot be undone.`)) return;
-        await supabase.storage.from('past_papers').remove([paper.file_path]);
+        const toRemove = [paper.file_path, paper.solution_file_path].filter(Boolean);
+        if (toRemove.length) await supabase.storage.from('past_papers').remove(toRemove);
         await supabase.from('past_papers').delete().eq('id', paper.id);
         setPastPapers(prev => prev.filter(p => p.id !== paper.id));
         setMessage({ type: 'success', text: 'Paper deleted.' });
+    }
+
+    // Uploads (or replaces) a solution PDF for a past paper. Reuses the same
+    // public 'past_papers' bucket under a solutions/ prefix.
+    async function saveSolution() {
+        if (!solutionPaper || !solutionFile) return;
+        setSolutionSaving(true);
+        try {
+            const safe = solutionFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const path = `solutions/${solutionPaper.id}_${Date.now()}_${safe}`;
+            const { error: upErr } = await supabase.storage
+                .from('past_papers')
+                .upload(path, solutionFile, { contentType: 'application/pdf', upsert: false });
+            if (upErr) throw upErr;
+            const { data: pub } = supabase.storage.from('past_papers').getPublicUrl(path);
+            const oldPath = solutionPaper.solution_file_path;
+            const { error: updErr } = await supabase.from('past_papers')
+                .update({ solution_file_url: pub.publicUrl, solution_file_path: path })
+                .eq('id', solutionPaper.id);
+            if (updErr) throw updErr;
+            // Clean up the previous solution object if this replaced one.
+            if (oldPath) await supabase.storage.from('past_papers').remove([oldPath]);
+            setPastPapers(prev => prev.map(p => p.id === solutionPaper.id
+                ? { ...p, solution_file_url: pub.publicUrl, solution_file_path: path } : p));
+            setMessage({ type: 'success', text: 'Solution PDF uploaded!' });
+            setSolutionPaper(null); setSolutionFile(null);
+        } catch (err) {
+            setMessage({ type: 'error', text: `Solution upload failed: ${err.message}` });
+        }
+        setSolutionSaving(false);
+    }
+
+    async function removeSolution(paper) {
+        if (!window.confirm('Remove the solution PDF for this paper?')) return;
+        setSolutionSaving(true);
+        try {
+            if (paper.solution_file_path) await supabase.storage.from('past_papers').remove([paper.solution_file_path]);
+            await supabase.from('past_papers').update({ solution_file_url: null, solution_file_path: null }).eq('id', paper.id);
+            setPastPapers(prev => prev.map(p => p.id === paper.id
+                ? { ...p, solution_file_url: null, solution_file_path: null } : p));
+            setMessage({ type: 'success', text: 'Solution removed.' });
+            setSolutionPaper(null);
+        } catch (err) {
+            setMessage({ type: 'error', text: `Failed: ${err.message}` });
+        }
+        setSolutionSaving(false);
+    }
+
+    // ── Quiz reward popup config ─────────────────────────────
+    async function fetchRewardConfig() {
+        setRewardLoading(true);
+        try {
+            const { data } = await supabase.from('app_settings').select('value').eq('key', 'quiz_reward_popup').maybeSingle();
+            if (data?.value) {
+                const cfg = JSON.parse(data.value);
+                setRewardEnabled(!!cfg.enabled);
+                if (cfg.title != null) setRewardTitle(cfg.title);
+                if (cfg.message != null) setRewardMessage(cfg.message);
+                setRewardCoupon(cfg.coupon_code || '');
+            }
+        } catch (err) {
+            console.error('Failed to fetch reward config:', err);
+        } finally {
+            setRewardLoading(false);
+        }
+    }
+
+    async function saveRewardConfig() {
+        setRewardSaving(true);
+        try {
+            const value = JSON.stringify({
+                enabled: rewardEnabled,
+                title: rewardTitle,
+                message: rewardMessage,
+                coupon_code: rewardCoupon.trim(),
+            });
+            const { error } = await supabase.from('app_settings')
+                .upsert({ key: 'quiz_reward_popup', value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+            if (error) throw error;
+            setMessage({ type: 'success', text: 'Quiz reward popup saved.' });
+        } catch (err) {
+            setMessage({ type: 'error', text: `Failed: ${err.message}` });
+        } finally {
+            setRewardSaving(false);
+        }
     }
 
     async function fetchAnswerRequestCounts() {
@@ -1472,6 +1571,7 @@ export default function Admin() {
         { id: 'reports', label: `Reports${reports.filter(r => r.status === 'pending').length ? ` (${reports.filter(r => r.status === 'pending').length})` : ''}`, icon: <FiAlertTriangle /> },
         { id: 'visitors', label: 'Visitors', icon: <FiUsers /> },
         { id: 'students', label: 'Students', icon: <FiUserCheck /> },
+        { id: 'quiz_reward', label: 'Quiz Reward', icon: <FiGift /> },
         { id: 'chats', label: `Chats${chatThreads.filter(t => t.unreadCount > 0).length ? ` (${chatThreads.filter(t => t.unreadCount > 0).length})` : ''}`, icon: <FiMessageCircle /> },
     ];
 
@@ -2104,6 +2204,18 @@ Exp: 5 times 5 equals 25.`}
                                                                     </a>
                                                                     {!isReadOnly && (
                                                                         <motion.button
+                                                                            className="btn-secondary"
+                                                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.7rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', ...(paper.solution_file_url ? { color: '#22c55e', borderColor: 'rgba(34,197,94,0.35)' } : {}) }}
+                                                                            onClick={() => { setSolutionPaper(paper); setSolutionFile(null); }}
+                                                                            whileHover={{ scale: 1.05 }}
+                                                                            whileTap={{ scale: 0.95 }}
+                                                                            title={paper.solution_file_url ? 'Edit solution PDF' : 'Add solution PDF'}
+                                                                        >
+                                                                            <FiFileText /> {paper.solution_file_url ? 'Solution ✓' : 'Solution'}
+                                                                        </motion.button>
+                                                                    )}
+                                                                    {!isReadOnly && (
+                                                                        <motion.button
                                                                             className="btn-delete"
                                                                             onClick={() => deletePastPaper(paper)}
                                                                             whileHover={{ scale: 1.05 }}
@@ -2121,6 +2233,60 @@ Exp: 5 times 5 equals 25.`}
                                             );
                                         })
                                     )}
+
+                                    {/* Solution PDF Upload Popup */}
+                                    <AnimatePresence>
+                                        {solutionPaper && (
+                                            <motion.div
+                                                className="admin-popup-overlay"
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                onClick={() => setSolutionPaper(null)}
+                                            >
+                                                <motion.div
+                                                    className="admin-popup-modal glass-card"
+                                                    initial={{ opacity: 0, scale: 0.92, y: 16 }}
+                                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                    exit={{ opacity: 0, scale: 0.92, y: 16 }}
+                                                    onClick={e => e.stopPropagation()}
+                                                >
+                                                    <div className="admin-popup-header">
+                                                        <h3>Solution PDF — {solutionPaper.title}</h3>
+                                                        <button className="admin-popup-close" onClick={() => setSolutionPaper(null)}><FiX /></button>
+                                                    </div>
+                                                    <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                                        {solutionPaper.solution_file_url && (
+                                                            <p style={{ margin: 0 }}>
+                                                                Current solution:{' '}
+                                                                <a href={solutionPaper.solution_file_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>View PDF</a>
+                                                            </p>
+                                                        )}
+                                                        <div className="form-field">
+                                                            <label>{solutionPaper.solution_file_url ? 'Replace with new PDF' : 'Solution PDF'}</label>
+                                                            <input
+                                                                className="admin-input"
+                                                                type="file"
+                                                                accept="application/pdf"
+                                                                onChange={e => setSolutionFile(e.target.files?.[0] || null)}
+                                                            />
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                            <button className="btn-primary" onClick={saveSolution} disabled={solutionSaving || !solutionFile}>
+                                                                <FiUpload /> {solutionSaving ? 'Uploading…' : (solutionPaper.solution_file_url ? 'Replace Solution' : 'Upload Solution')}
+                                                            </button>
+                                                            {solutionPaper.solution_file_url && (
+                                                                <button className="btn-secondary" onClick={() => removeSolution(solutionPaper)} disabled={solutionSaving} style={{ color: 'var(--error)' }}>
+                                                                    <FiTrash2 /> Remove
+                                                                </button>
+                                                            )}
+                                                            <button className="btn-secondary" onClick={() => setSolutionPaper(null)} disabled={solutionSaving}>Cancel</button>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
 
                                     {/* Answer Request Popup */}
                                     <AnimatePresence>
@@ -2401,6 +2567,68 @@ Exp: 5 times 5 equals 25.`}
                                                         )}
                                                     </tbody>
                                                 </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {/* ═══════════════════════════════════════════
+                        QUIZ REWARD TAB
+                    ════════════════════════════════════════════ */}
+                            {tab === 'quiz_reward' && (
+                                <motion.div key="quiz_reward" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+                                    <div className="admin-section glass-card">
+                                        <div className="section-header">
+                                            <div>
+                                                <h2><FiGift /> Quiz Reward Popup</h2>
+                                                <p className="subtitle">Show a congratulations popup with a coupon after a student submits any quiz. Turn it off anytime and it stops appearing for everyone.</p>
+                                            </div>
+                                            <div className="section-header-pill" style={rewardEnabled ? { background: 'rgba(34,197,94,0.12)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)' } : {}}>
+                                                {rewardEnabled ? 'ON' : 'OFF'}
+                                            </div>
+                                        </div>
+
+                                        {rewardLoading ? (
+                                            <div className="loading-spinner"></div>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', maxWidth: '640px' }}>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontWeight: 600 }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={rewardEnabled}
+                                                        onChange={e => setRewardEnabled(e.target.checked)}
+                                                        style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }}
+                                                        disabled={isReadOnly}
+                                                    />
+                                                    Show reward popup after quiz submission
+                                                </label>
+
+                                                <div className="form-field">
+                                                    <label>Title</label>
+                                                    <input className="admin-input" type="text" value={rewardTitle} onChange={e => setRewardTitle(e.target.value)} placeholder="Congratulations! 🎉" disabled={isReadOnly} />
+                                                </div>
+
+                                                <div className="form-field">
+                                                    <label>Message</label>
+                                                    <textarea className="admin-input" rows={3} value={rewardMessage} onChange={e => setRewardMessage(e.target.value)} placeholder="You have unlocked a coupon to access all quizzes on the dashboard!" disabled={isReadOnly} />
+                                                </div>
+
+                                                <div className="form-field">
+                                                    <label>Coupon code (shown to the student)</label>
+                                                    <input className="admin-input" type="text" value={rewardCoupon} onChange={e => setRewardCoupon(e.target.value)} placeholder="e.g. QUIZ50" disabled={isReadOnly} />
+                                                    <p className="subtitle" style={{ marginTop: '0.4rem' }}>
+                                                        Tip: create this code in the <strong>Coupons</strong> section (Premium mode) scoped to <em>Daily Worksheet</em> so it works on the dashboard purchase.
+                                                    </p>
+                                                </div>
+
+                                                {!isReadOnly && (
+                                                    <div>
+                                                        <button className="btn-primary" onClick={saveRewardConfig} disabled={rewardSaving}>
+                                                            <FiSave /> {rewardSaving ? 'Saving…' : 'Save Reward Popup'}
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
