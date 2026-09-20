@@ -123,17 +123,33 @@ textarea {
   outline: none;
 }
 
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dark) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-dark);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--primary-dark);
   border-radius: 3px;
+  opacity: 0.6;
+}
+
+@media (max-width: 768px) {
+  html {
+    scrollbar-width: thin;
+  }
+
+  ::-webkit-scrollbar {
+    width: 3px;
+  }
 }
 
 /* Utility classes */

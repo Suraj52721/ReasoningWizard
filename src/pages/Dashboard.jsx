@@ -131,8 +131,8 @@ function PurchasePopup({ onClose, onPurchase, price, purchasing }) {
 
                 <div className="dash-cart-item">
                     <div className="dash-cart-item-info">
-                        <strong>Daily Worksheet Access</strong>
-                        <span>1 year · all quizzes &amp; worksheets</span>
+                        <strong>Old Worksheets Access</strong>
+                        <span>1 year · all old quizzes &amp; worksheets</span>
                     </div>
                     <span className="dash-cart-item-price">£{(price / 100).toFixed(2)}</span>
                 </div>
@@ -203,6 +203,43 @@ function PurchasePopup({ onClose, onPurchase, price, purchasing }) {
     );
 }
 
+const OLD_WORKSHEETS_BULLETS = [
+    'Unlock instantly 150+ 11+ Maths worksheets based on past papers and real exam-style questions',
+    'Practise with 1,000+ of the most important Maths questions designed for 11+ preparation',
+    'Access detailed, step-by-step solutions explained by our expert tutors',
+    'Download worksheets as PDFs or practise online with interactive quizzes',
+    'Take online Maths quizzes to improve speed, accuracy and exam technique',
+    'Track your performance and identify areas where you need more practice',
+    'Boost your 11+ exam speed, accuracy and confidence with regular practice',
+    'Suitable for GL, CSSE, Kent Test, SET, ISEB & Independent Schools',
+    'Designed to help kids practise consistently and build 11+ confidence',
+];
+
+function OldWorksheetsPromo({ price, purchasing, onUnlock }) {
+    return (
+        <motion.div className="old-worksheets-promo glass-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <div className="owp-header">
+                <span className="owp-badge"><FiLock /> Old Worksheets Bundle</span>
+                <h3 className="owp-title">11+ Maths Worksheets 2026 — Based on Past Papers</h3>
+            </div>
+            <ul className="owp-bullets">
+                {OLD_WORKSHEETS_BULLETS.map((b, i) => (
+                    <li key={i}><FiCheckCircle /> <span>{b}</span></li>
+                ))}
+            </ul>
+            <div className="owp-footer">
+                <div className="owp-price">
+                    <strong>£{(price / 100).toFixed(2)}</strong>
+                    <span>/ year</span>
+                </div>
+                <motion.button className="btn-primary owp-cta" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={onUnlock} disabled={purchasing}>
+                    <FiLock /> {purchasing ? 'Processing...' : 'Unlock Old Worksheets'}
+                </motion.button>
+            </div>
+        </motion.div>
+    );
+}
+
 const fadeUp = {
     hidden: { opacity: 0, y: 30 },
     visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.5 } })
@@ -215,7 +252,7 @@ const stagger = {
 export default function Dashboard() {
     const { user, profile, updateProfile, loading: authLoading } = useAuth();
     const navigate = useNavigate();
-    const [tab, setTab] = useState('quizzes');
+    const [tab, setTab] = useState('new');
     const [quizzes, setQuizzes] = useState([]);
     const [attempts, setAttempts] = useState([]);
     const [sessions, setSessions] = useState([]);
@@ -375,21 +412,20 @@ export default function Dashboard() {
     const getSession = (quizId) => sessions.find(s => s.quiz_id === quizId);
     const getWorksheet = (quiz) => worksheets.find(w => w.quiz_id === quiz.id);
 
-    // Only the first 3 dashboard quizzes (most recent — quizzes is ordered by
-    // quiz_date descending) stay unlocked. Everything else is locked behind the
-    // purchase for signed-in users without access.
-    const unlockedQuizIds = useMemo(
-        () => new Set(quizzes.slice(0, 3).map(q => q.id)),
-        [quizzes]
-    );
+    // Permanent split, not time-based: 'new' quizzes (uploaded from now on)
+    // are free for everyone; 'old' quizzes (the pre-existing catalogue) sit
+    // behind the 1-year bundle purchase. Mirrors quizzes.worksheet_group.
+    const getWorksheetGroup = (quiz) => quiz.worksheet_group || 'new';
+    const newQuizzes = useMemo(() => quizzes.filter(q => getWorksheetGroup(q) === 'new'), [quizzes]);
+    const oldQuizzes = useMemo(() => quizzes.filter(q => getWorksheetGroup(q) === 'old'), [quizzes]);
 
-    const isQuizLocked = (quizId) => {
+    const isQuizLocked = (quiz) => {
         // Logged-out visitors never see the locked/purchase state. Their tiles
         // look normal and clicking prompts the sign-in / create-account popup.
         // The purchase lock only applies to signed-in users without access.
         if (!user) return false;
-        if (hasDashboardAccess) return false;
-        return !unlockedQuizIds.has(quizId);
+        if (getWorksheetGroup(quiz) === 'new') return false;
+        return !hasDashboardAccess;
     };
 
     // Records a worksheet download. The DB trigger trg_sync_download_count then
@@ -462,31 +498,44 @@ export default function Dashboard() {
         }
     };
 
+    // The active dashboard tab drives which quiz list subject filtering and
+    // grouping operate over — 'new' (free) and 'old' (bundle) are separate lists.
+    const activeTabQuizzes = useMemo(
+        () => (tab === 'new' ? newQuizzes : tab === 'old' ? oldQuizzes : []),
+        [tab, newQuizzes, oldQuizzes]
+    );
+
     const subjects = useMemo(() => {
-        const s = [...new Set(quizzes.map(q => q.subject).filter(Boolean))].sort();
+        const s = [...new Set(activeTabQuizzes.map(q => q.subject).filter(Boolean))].sort();
         return s.length > 0 ? ['All', ...s] : [];
-    }, [quizzes]);
+    }, [activeTabQuizzes]);
 
     const filteredQuizzes = activeSubject === 'All'
-        ? quizzes
-        : quizzes.filter(q => q.subject === activeSubject);
+        ? activeTabQuizzes
+        : activeTabQuizzes.filter(q => q.subject === activeSubject);
 
     // Groups for 'All' view: [{subj, quizzes[]}] in sorted order
     const groupedBySubject = useMemo(() => {
         const map = {};
-        quizzes.forEach(q => {
+        activeTabQuizzes.forEach(q => {
             const s = q.subject || 'General';
             if (!map[s]) map[s] = [];
             map[s].push(q);
         });
         return subjects.slice(1).map(s => ({ subj: s, quizzes: map[s] || [] })).filter(g => g.quizzes.length > 0);
-    }, [quizzes, subjects]);
+    }, [activeTabQuizzes, subjects]);
+
+    // Reset the subject filter when switching between New/Old Worksheets so a
+    // subject that doesn't exist in the other tab doesn't hide everything.
+    useEffect(() => {
+        setActiveSubject('All');
+    }, [tab]);
 
     const renderCard = (quiz, i) => {
         const attempt = getAttempt(quiz.id);
         const session = getSession(quiz.id);
         const worksheet = getWorksheet(quiz);
-        const locked = isQuizLocked(quiz.id);
+        const locked = isQuizLocked(quiz);
 
         return (
             <motion.div key={quiz.id} className={`quiz-card glass-card rw-glow-border ${attempt ? 'completed' : ''} ${locked ? 'locked' : ''}`} variants={fadeUp} custom={i} whileHover={locked ? {} : { y: -4, borderColor: 'rgba(245,197,24,0.3)' }}>
@@ -506,7 +555,7 @@ export default function Dashboard() {
                 {locked ? (
                     <div className="quiz-card-actions quiz-locked-cta">
                         <p className="quiz-locked-text">
-                            Purchase to unlock <strong>unlimited quizzes &amp; worksheets</strong> — get <strong>1 year access</strong>.
+                            Purchase the <strong>Old Worksheets bundle</strong> to unlock this quiz &amp; worksheet — get <strong>1 year access</strong>.
                         </p>
                         <motion.button className="btn-primary quiz-btn" whileHover={{ scale: 1.02 }} onClick={() => setShowPurchasePopup(true)} disabled={purchasing}>
                             <FiLock /> {`Unlock for £${(dashboardPrice / 100).toFixed(2)} / 1 year`}
@@ -541,7 +590,7 @@ export default function Dashboard() {
                                 <FiPlay /> Attempt Online
                             </motion.button>
                         )}
-                        {worksheet && (
+                        {worksheet && (user ? worksheet.file_url : true) && (
                             user ? (
                                 <a href={worksheet.file_url} download={worksheet.file_name} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: '0.5rem' }} onClick={() => logWorksheetDownload(worksheet.id)}>
                                     <motion.button className="btn-secondary quiz-btn worksheet-dl-btn" whileHover={{ scale: 1.02 }}>
@@ -582,7 +631,8 @@ export default function Dashboard() {
     };
 
     const tabs = [
-        { id: 'quizzes', label: 'Daily Worksheets', icon: <FiBook /> },
+        { id: 'new', label: 'New Worksheets', icon: <FiBook /> },
+        { id: 'old', label: 'Old Worksheets', icon: <FiLock /> },
         { id: 'leaderboard', label: 'Leaderboard', icon: <FiTrendingUp /> },
         { id: 'profile', label: 'Profile', icon: <FiUser /> },
     ];
@@ -620,8 +670,8 @@ export default function Dashboard() {
 
                 {/* Content */}
                 <AnimatePresence mode="wait">
-                    {tab === 'quizzes' && (
-                        <motion.div key="quizzes" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
+                    {(tab === 'new' || tab === 'old') && (
+                        <motion.div key={tab} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
 
                             {/* Subject Toggle */}
                             {!loadingQuizzes && subjects.length > 1 && (
@@ -651,6 +701,15 @@ export default function Dashboard() {
                                 </motion.div>
                             )}
 
+                            {/* Old Worksheets bundle promo — only while the user hasn't unlocked it yet */}
+                            {tab === 'old' && !loadingQuizzes && !authLoading && !hasDashboardAccess && (
+                                <OldWorksheetsPromo
+                                    price={dashboardPrice}
+                                    purchasing={purchasing}
+                                    onUnlock={() => (user ? setShowPurchasePopup(true) : setShowLoginPopup(true))}
+                                />
+                            )}
+
                             {(loadingQuizzes || authLoading) ? (
                                 <div className="loading-state">
                                     <motion.div className="spinner" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
@@ -659,8 +718,8 @@ export default function Dashboard() {
                             ) : filteredQuizzes.length === 0 ? (
                                 <motion.div className="empty-state glass-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                     <FiCalendar />
-                                    <h3>{quizzes.length === 0 ? 'No quizzes available' : `No ${activeSubject} quizzes`}</h3>
-                                    <p>{quizzes.length === 0 ? 'Check back later for new daily quizzes!' : 'Try selecting a different subject.'}</p>
+                                    <h3>{activeTabQuizzes.length === 0 ? (tab === 'new' ? 'No new worksheets yet' : 'No old worksheets available') : `No ${activeSubject} quizzes`}</h3>
+                                    <p>{activeTabQuizzes.length === 0 ? 'Check back later for new daily quizzes!' : 'Try selecting a different subject.'}</p>
                                 </motion.div>
                             ) : activeSubject === 'All' ? (
                                 /* ── All: Subject → Cards ── */

@@ -94,6 +94,7 @@ export default function Admin() {
     const [negativeMarking, setNegativeMarking] = useState(false);
     const [negativeMarks, setNegativeMarks] = useState(0.25);
     const [quizScope, setQuizScope] = useState('dashboard');
+    const [worksheetGroup, setWorksheetGroup] = useState('new');
 
     // Questions
     const [inputMode, setInputMode] = useState('bulk'); // bulk | manual
@@ -170,6 +171,7 @@ export default function Admin() {
     }, [premiumNVRWorksheets, premiumTestPapers]);
 
     const resolveQuizScope = (quiz) => quiz.quiz_mode || (premiumQuizIds.has(quiz.id) ? 'premium' : 'dashboard');
+    const resolveWorksheetGroup = (quiz) => quiz.worksheet_group || 'new';
 
     // Filtered quiz lists for each mode
     const dashboardQuizzes = useMemo(() => quizzes.filter(q => resolveQuizScope(q) === 'dashboard'), [quizzes, premiumQuizIds]);
@@ -1066,6 +1068,7 @@ export default function Admin() {
             ? ['', '', '', '', '']
             : ['', '', '', ''];
         setQuizScope(resolvedScope);
+        setWorksheetGroup(resolveWorksheetGroup(quiz));
 
         // Fetch linked worksheet
         const { data: wsData } = await supabase
@@ -1240,6 +1243,7 @@ export default function Admin() {
                         negative_marks: negativeMarking ? negativeMarks : 0,
                         is_draft: isDraft,
                         quiz_mode: quizScope,
+                        worksheet_group: quizScope === 'premium' ? 'new' : worksheetGroup,
                     })
                     .eq('id', editingQuizId)
                     .select()
@@ -1264,6 +1268,7 @@ export default function Admin() {
                         negative_marks: negativeMarking ? negativeMarks : 0,
                         is_draft: isDraft,
                         quiz_mode: quizScope,
+                        worksheet_group: quizScope === 'premium' ? 'new' : worksheetGroup,
                     })
                     .select()
                     .single();
@@ -1433,6 +1438,7 @@ export default function Admin() {
             setExistingWorksheet(null);
             setWorksheetRemoved(false);
             setQuizScope(adminMode === 'premium' ? 'premium' : 'dashboard');
+            setWorksheetGroup('new');
             fetchQuizzes();
         } catch (err) {
             console.error('Publish error:', err);
@@ -1622,7 +1628,7 @@ export default function Admin() {
                         <div className="admin-mode-cards">
                             <motion.button
                                 className="admin-mode-card admin-mode-dashboard"
-                                onClick={() => { setAdminMode('dashboard'); setQuizScope('dashboard'); setTab('create'); }}
+                                onClick={() => { setAdminMode('dashboard'); setQuizScope('dashboard'); setWorksheetGroup('new'); setTab('create'); }}
                                 whileHover={{ scale: 1.03, y: -4 }}
                                 whileTap={{ scale: 0.98 }}
                             >
@@ -1758,6 +1764,29 @@ export default function Admin() {
                                                     </>
                                                 )}
                                             </div>
+                                            {adminMode !== 'premium' && (
+                                                <div className="form-group">
+                                                    <label>Worksheet Access</label>
+                                                    <div className="mode-toggle">
+                                                        <button
+                                                            type="button"
+                                                            className={`mode-btn ${worksheetGroup === 'new' ? 'active' : ''}`}
+                                                            onClick={() => setWorksheetGroup('new')}
+                                                            disabled={isReadOnly}
+                                                        >
+                                                            New (Free)
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`mode-btn ${worksheetGroup === 'old' ? 'active' : ''}`}
+                                                            onClick={() => setWorksheetGroup('old')}
+                                                            disabled={isReadOnly}
+                                                        >
+                                                            Old (Bundle)
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Negative marking */}
@@ -2754,9 +2783,9 @@ Exp: 5 times 5 equals 25.`}
                                     </div>
                                     <div className="nvr-price-bar glass-card" style={{ marginBottom: '1.5rem' }}>
                                         <div className="nvr-price-copy">
-                                            <span className="nvr-price-label">Dashboard Tiles 1-Year Access pricing</span>
+                                            <span className="nvr-price-label">Old Worksheets Bundle (1-Year Access) pricing</span>
                                             <strong>£{(globalDashboardPrice / 100).toFixed(2)}</strong>
-                                            <small>This is the global 1-year access price stored in <span>app_settings</span>.</small>
+                                            <small>This is the global "Old Worksheets" bundle price stored in <span>app_settings</span> (key: dashboard_price_pence).</small>
                                         </div>
                                         {!isReadOnly && (
                                             <motion.button
