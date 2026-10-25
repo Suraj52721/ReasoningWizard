@@ -194,6 +194,7 @@ export default function Admin() {
         const nvrSubscriptions = successfulPurchases.filter(purchase => purchase.type === 'nvr_subscription').length;
         const paperPurchases = successfulPurchases.filter(purchase => purchase.type === 'paper_purchase').length;
         const dashboardPurchases = successfulPurchases.filter(purchase => purchase.type === 'dashboard_purchase').length;
+        const pastPaperPurchases = successfulPurchases.filter(purchase => purchase.type === 'past_paper_solution').length;
         const activePayments = successfulPurchases.length;
 
         return {
@@ -201,6 +202,7 @@ export default function Admin() {
             nvrSubscriptions,
             paperPurchases,
             dashboardPurchases,
+            pastPaperPurchases,
             activePayments,
             totalRevenue,
         };
@@ -359,16 +361,18 @@ export default function Admin() {
         setLoadingPurchases(true);
         try {
             // Fetch NVR, paper and dashboard purchases
-            const [nvrRes, paperRes, dashboardRes] = await Promise.all([
+            const [nvrRes, paperRes, dashboardRes, pastPaperRes] = await Promise.all([
                 supabase.from('nvr_subscriptions').select('*').order('created_at', { ascending: false }),
                 supabase.from('paper_purchases').select('*, papers:premium_test_papers(title)').order('created_at', { ascending: false }),
-                supabase.from('dashboard_purchases').select('*').order('created_at', { ascending: false })
+                supabase.from('dashboard_purchases').select('*').order('created_at', { ascending: false }),
+                supabase.from('past_paper_purchases').select('*, papers:past_papers(title)').order('created_at', { ascending: false })
             ]);
 
             const allPurchases = [
                 ...(nvrRes.data || []).map(p => ({ ...p, type: 'nvr_subscription', itemName: 'NVR Subscription' })),
                 ...(paperRes.data || []).map(p => ({ ...p, type: 'paper_purchase', itemName: p.papers?.title || 'Single Paper' })),
-                ...(dashboardRes.data || []).map(p => ({ ...p, type: 'dashboard_purchase', itemName: 'Dashboard Access' }))
+                ...(dashboardRes.data || []).map(p => ({ ...p, type: 'dashboard_purchase', itemName: 'Dashboard Access' })),
+                ...(pastPaperRes.data || []).map(p => ({ ...p, type: 'past_paper_solution', itemName: `Solution: ${p.papers?.title || 'Past Paper'}` }))
             ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
             // Fetch profiles for the users in these purchases
@@ -3313,7 +3317,7 @@ Exp: 5 times 5 equals 25.`}
                                         <div className="section-header purchases-header">
                                             <div>
                                                 <h2><FiDollarSign /> Purchases & Subscriptions</h2>
-                                                <p className="subtitle">View all premium NVR subscriptions, bundle purchases, and individual paper transactions.</p>
+                                                <p className="subtitle">View all premium NVR subscriptions, bundle purchases, individual paper transactions and past-paper solution purchases.</p>
                                             </div>
                                             <div className="section-header-pill">{purchases.length} records</div>
                                         </div>
@@ -3338,6 +3342,11 @@ Exp: 5 times 5 equals 25.`}
                                                 <span className="purchase-summary-label">Dashboard purchases</span>
                                                 <strong>{purchaseSummary.dashboardPurchases}</strong>
                                                 <small>Dashboard access transactions</small>
+                                            </div>
+                                            <div className="purchase-summary-card glass-card">
+                                                <span className="purchase-summary-label">Past paper solutions</span>
+                                                <strong>{purchaseSummary.pastPaperPurchases}</strong>
+                                                <small>Solution unlock transactions</small>
                                             </div>
                                             <div className="purchase-summary-card glass-card">
                                                 <span className="purchase-summary-label">Revenue</span>
@@ -3368,7 +3377,7 @@ Exp: 5 times 5 equals 25.`}
                                                                 <td>{p.display_name}</td>
                                                                 <td>
                                                                     <span className={`difficulty-badge ${p.type === 'nvr_subscription' ? 'easy' : 'hard'}`}>
-                                                                        {p.type.replace('_', ' ').toUpperCase()}
+                                                                        {p.type.replace(/_/g, ' ').toUpperCase()}
                                                                     </span>
                                                                 </td>
                                                                 <td>{p.itemName}</td>

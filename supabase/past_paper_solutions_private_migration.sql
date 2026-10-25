@@ -56,6 +56,11 @@ DROP POLICY IF EXISTS "Users read own past_paper_purchases" ON public.past_paper
 CREATE POLICY "Users read own past_paper_purchases"
   ON public.past_paper_purchases FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins read all past_paper_purchases" ON public.past_paper_purchases;
+CREATE POLICY "Admins read all past_paper_purchases"
+  ON public.past_paper_purchases FOR SELECT
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
 ALTER TABLE public.past_paper_purchases ADD COLUMN IF NOT EXISTS coupon_code TEXT;
 
 -- 3. Bundle discount (% off when 2+ solutions are bought together). Default 0.
