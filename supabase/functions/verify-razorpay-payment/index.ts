@@ -90,6 +90,15 @@ serve(async (req) => {
           .eq("status", "pending");
 
         if (error) throw error;
+      } else if (type === "past_paper_solution_purchase") {
+        const { error } = await supabaseAdmin
+          .from("past_paper_purchases")
+          .update({ status: "failed" })
+          .eq("razorpay_order_id", razorpay_order_id)
+          .eq("user_id", user.id)
+          .eq("status", "pending");
+
+        if (error) throw error;
       } else if (type === "bundle_purchase" || type === "individual_paper_purchase") {
         const { error } = await supabaseAdmin
           .from("paper_purchases")
@@ -181,6 +190,29 @@ serve(async (req) => {
         .eq("status", "pending");
 
       if (error) throw error;
+
+    } else if (type === "past_paper_solution_purchase") {
+      const { data: done, error } = await supabaseAdmin
+        .from("past_paper_purchases")
+        .update({
+          razorpay_payment_id,
+          razorpay_signature,
+          status: "completed",
+          purchased_at: new Date().toISOString(),
+        })
+        .eq("razorpay_order_id", razorpay_order_id)
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .select("coupon_code");
+
+      if (error) throw error;
+
+      // Count the coupon use once per order (server-side, not forgeable).
+      const code = done?.[0]?.coupon_code;
+      if (code) {
+        const { data: c } = await supabaseAdmin.from("coupon_codes").select("id, current_uses").eq("code", code).maybeSingle();
+        if (c) await supabaseAdmin.from("coupon_codes").update({ current_uses: (c.current_uses || 0) + 1 }).eq("id", c.id);
+      }
 
     } else if (type === "bundle_purchase" || type === "individual_paper_purchase") {
       const { error } = await supabaseAdmin

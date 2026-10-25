@@ -177,6 +177,14 @@ export async function createRazorpayOrder({ amount, currency = 'INR', receipt, t
 }
 
 /**
+ * Returns a short-lived signed URL for a purchased past-paper solution PDF.
+ */
+export async function getPastPaperSolutionUrl(paper_id) {
+  const { url } = await callEdgeFunction('get-past-paper-solution', { paper_id });
+  return url;
+}
+
+/**
  * Calls the Supabase Edge Function to verify the Razorpay payment signature.
  */
 export async function verifyRazorpayPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature, type }) {

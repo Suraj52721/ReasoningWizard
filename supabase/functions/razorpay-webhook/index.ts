@@ -104,6 +104,9 @@ Deno.serve(async (req) => {
     else if (await applyUpdate("paper_purchases", {
       razorpay_payment_id: paymentId, status: "completed", purchased_at: nowIso,
     })) updated = true;
+    else if (await applyUpdate("past_paper_purchases", {
+      razorpay_payment_id: paymentId, status: "completed", purchased_at: nowIso,
+    })) updated = true;
 
     return new Response(JSON.stringify({ success: true, updated }), {
       status: 200,

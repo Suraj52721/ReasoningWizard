@@ -139,6 +139,15 @@ Deno.serve(async (req) => {
       })) healed.papers++;
     }
 
+    // Past-paper solution purchases.
+    for (const orderId of await gather("past_paper_purchases")) {
+      const paymentId = await paidPaymentId(orderId);
+      if (!paymentId) continue;
+      if (await applyUpdate("past_paper_purchases", orderId, {
+        razorpay_payment_id: paymentId, status: "completed", purchased_at: new Date().toISOString(),
+      })) healed.papers++;
+    }
+
     return new Response(JSON.stringify({ success: true, healed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

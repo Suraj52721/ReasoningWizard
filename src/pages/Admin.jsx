@@ -218,6 +218,21 @@ export default function Admin() {
     // Per-paper solution PDF editing
     const [solutionPaper, setSolutionPaper] = useState(null);
     const [solutionFile, setSolutionFile] = useState(null);
+    const [solutionPrice, setSolutionPrice] = useState('0.99');
+    const [pastPaperBundlePct, setPastPaperBundlePct] = useState(0);
+
+    useEffect(() => {
+        supabase.from('app_settings').select('value').eq('key', 'past_paper_bundle_discount_pct').maybeSingle()
+            .then(({ data }) => { if (data?.value) setPastPaperBundlePct(parseInt(data.value, 10) || 0); });
+    }, []);
+
+    async function updatePastPaperBundlePct() {
+        const p = prompt('Bundle discount (%) when a buyer purchases 2+ past-paper solutions together (0 = none):', pastPaperBundlePct);
+        if (p === null || p === '' || isNaN(p) || parseInt(p) < 0 || parseInt(p) > 100) return;
+        const { error } = await supabase.from('app_settings').upsert({ key: 'past_paper_bundle_discount_pct', value: parseInt(p).toString() });
+        if (error) setMessage({ type: 'error', text: 'Error updating bundle discount.' });
+        else { setPastPaperBundlePct(parseInt(p)); setMessage({ type: 'success', text: 'Past-paper bundle discount updated.' }); }
+    }
     const [solutionSaving, setSolutionSaving] = useState(false);
 
     // Post-quiz reward popup config (stored in app_settings key 'quiz_reward_popup')
@@ -399,35 +414,39 @@ export default function Admin() {
 
     async function deletePastPaper(paper) {
         if (!window.confirm(`Delete "${paper.title}"? This cannot be undone.`)) return;
-        const toRemove = [paper.file_path, paper.solution_file_path].filter(Boolean);
-        if (toRemove.length) await supabase.storage.from('past_papers').remove(toRemove);
+        if (paper.file_path) await supabase.storage.from('past_papers').remove([paper.file_path]);
+        if (paper.solution_file_path) await supabase.storage.from('past_paper_solutions').remove([paper.solution_file_path]);
         await supabase.from('past_papers').delete().eq('id', paper.id);
         setPastPapers(prev => prev.filter(p => p.id !== paper.id));
         setMessage({ type: 'success', text: 'Paper deleted.' });
     }
 
-    // Uploads (or replaces) a solution PDF for a past paper. Reuses the same
-    // public 'past_papers' bucket under a solutions/ prefix.
+    // Uploads (or replaces) a solution PDF for a past paper into the
+    // private 'past_paper_solutions' bucket.
     async function saveSolution() {
         if (!solutionPaper || !solutionFile) return;
+        const pricePence = Math.round(parseFloat(solutionPrice) * 100);
+        if (!Number.isFinite(pricePence) || pricePence < 1) {
+            setMessage({ type: 'error', text: 'Enter a valid solution price (e.g. 0.99).' });
+            return;
+        }
         setSolutionSaving(true);
         try {
             const safe = solutionFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
             const path = `solutions/${solutionPaper.id}_${Date.now()}_${safe}`;
             const { error: upErr } = await supabase.storage
-                .from('past_papers')
+                .from('past_paper_solutions')
                 .upload(path, solutionFile, { contentType: 'application/pdf', upsert: false });
             if (upErr) throw upErr;
-            const { data: pub } = supabase.storage.from('past_papers').getPublicUrl(path);
             const oldPath = solutionPaper.solution_file_path;
             const { error: updErr } = await supabase.from('past_papers')
-                .update({ solution_file_url: pub.publicUrl, solution_file_path: path })
+                .update({ solution_file_url: null, solution_file_path: path, solution_price_pence: pricePence })
                 .eq('id', solutionPaper.id);
             if (updErr) throw updErr;
             // Clean up the previous solution object if this replaced one.
-            if (oldPath) await supabase.storage.from('past_papers').remove([oldPath]);
+            if (oldPath) await supabase.storage.from('past_paper_solutions').remove([oldPath]);
             setPastPapers(prev => prev.map(p => p.id === solutionPaper.id
-                ? { ...p, solution_file_url: pub.publicUrl, solution_file_path: path } : p));
+                ? { ...p, solution_file_url: null, solution_file_path: path, solution_price_pence: pricePence } : p));
             setMessage({ type: 'success', text: 'Solution PDF uploaded!' });
             setSolutionPaper(null); setSolutionFile(null);
         } catch (err) {
@@ -436,11 +455,44 @@ export default function Admin() {
         setSolutionSaving(false);
     }
 
+    // Solutions live in a private bucket — admins view them via a signed URL.
+    async function viewSolution(e) {
+        e.preventDefault();
+        const { data, error } = await supabase.storage
+            .from('past_paper_solutions')
+            .createSignedUrl(solutionPaper.solution_file_path, 120);
+        if (error) {
+            setMessage({ type: 'error', text: `Could not open PDF: ${error.message}. If this solution predates private storage, run scripts/migrate-solutions-private.mjs.` });
+            return;
+        }
+        window.open(data.signedUrl, '_blank', 'noopener');
+    }
+
+    // Update only the solution price (no re-upload needed).
+    async function saveSolutionPrice() {
+        if (!solutionPaper) return;
+        const pricePence = Math.round(parseFloat(solutionPrice) * 100);
+        if (!Number.isFinite(pricePence) || pricePence < 1) {
+            setMessage({ type: 'error', text: 'Enter a valid solution price (e.g. 0.99).' });
+            return;
+        }
+        setSolutionSaving(true);
+        const { error } = await supabase.from('past_papers')
+            .update({ solution_price_pence: pricePence }).eq('id', solutionPaper.id);
+        if (error) setMessage({ type: 'error', text: `Failed: ${error.message}` });
+        else {
+            setPastPapers(prev => prev.map(p => p.id === solutionPaper.id ? { ...p, solution_price_pence: pricePence } : p));
+            setSolutionPaper(prev => ({ ...prev, solution_price_pence: pricePence }));
+            setMessage({ type: 'success', text: 'Solution price updated.' });
+        }
+        setSolutionSaving(false);
+    }
+
     async function removeSolution(paper) {
         if (!window.confirm('Remove the solution PDF for this paper?')) return;
         setSolutionSaving(true);
         try {
-            if (paper.solution_file_path) await supabase.storage.from('past_papers').remove([paper.solution_file_path]);
+            if (paper.solution_file_path) await supabase.storage.from('past_paper_solutions').remove([paper.solution_file_path]);
             await supabase.from('past_papers').update({ solution_file_url: null, solution_file_path: null }).eq('id', paper.id);
             setPastPapers(prev => prev.map(p => p.id === paper.id
                 ? { ...p, solution_file_url: null, solution_file_path: null } : p));
@@ -2172,6 +2224,17 @@ Exp: 5 times 5 equals 25.`}
                                         </div>
                                     )}
 
+                                    <div className="nvr-price-bar glass-card" style={{ marginBottom: '1.5rem' }}>
+                                        <div className="nvr-price-copy">
+                                            <span className="nvr-price-label">Past-paper solutions bundle discount</span>
+                                            <strong>{pastPaperBundlePct}% off</strong>
+                                            <small>Applied when a buyer checks out 2+ solutions together (app_settings: past_paper_bundle_discount_pct). Per-paper prices are set via each paper's Solution button.</small>
+                                        </div>
+                                        {!isReadOnly && (
+                                            <button type="button" className="btn-secondary btn-sm" onClick={updatePastPaperBundlePct}>Change discount</button>
+                                        )}
+                                    </div>
+
                                     {/* Difficulty sections */}
                                     {loadingPastPapers ? (
                                         <div className="loading-state">
@@ -2234,13 +2297,13 @@ Exp: 5 times 5 equals 25.`}
                                                                     {!isReadOnly && (
                                                                         <motion.button
                                                                             className="btn-secondary"
-                                                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.7rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', ...(paper.solution_file_url ? { color: '#22c55e', borderColor: 'rgba(34,197,94,0.35)' } : {}) }}
-                                                                            onClick={() => { setSolutionPaper(paper); setSolutionFile(null); }}
+                                                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.7rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', ...(paper.solution_file_path ? { color: '#22c55e', borderColor: 'rgba(34,197,94,0.35)' } : {}) }}
+                                                                            onClick={() => { setSolutionPaper(paper); setSolutionFile(null); setSolutionPrice(((paper.solution_price_pence ?? 99) / 100).toFixed(2)); }}
                                                                             whileHover={{ scale: 1.05 }}
                                                                             whileTap={{ scale: 0.95 }}
-                                                                            title={paper.solution_file_url ? 'Edit solution PDF' : 'Add solution PDF'}
+                                                                            title={paper.solution_file_path ? 'Edit solution PDF' : 'Add solution PDF'}
                                                                         >
-                                                                            <FiFileText /> {paper.solution_file_url ? 'Solution ✓' : 'Solution'}
+                                                                            <FiFileText /> {paper.solution_file_path ? 'Solution ✓' : 'Solution'}
                                                                         </motion.button>
                                                                     )}
                                                                     {!isReadOnly && (
@@ -2285,14 +2348,14 @@ Exp: 5 times 5 equals 25.`}
                                                         <button className="admin-popup-close" onClick={() => setSolutionPaper(null)}><FiX /></button>
                                                     </div>
                                                     <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                                        {solutionPaper.solution_file_url && (
+                                                        {solutionPaper.solution_file_path && (
                                                             <p style={{ margin: 0 }}>
                                                                 Current solution:{' '}
-                                                                <a href={solutionPaper.solution_file_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>View PDF</a>
+                                                                <a href="#view" onClick={viewSolution} style={{ color: 'var(--primary)' }}>View PDF</a>
                                                             </p>
                                                         )}
                                                         <div className="form-field">
-                                                            <label>{solutionPaper.solution_file_url ? 'Replace with new PDF' : 'Solution PDF'}</label>
+                                                            <label>{solutionPaper.solution_file_path ? 'Replace with new PDF' : 'Solution PDF'}</label>
                                                             <input
                                                                 className="admin-input"
                                                                 type="file"
@@ -2300,11 +2363,27 @@ Exp: 5 times 5 equals 25.`}
                                                                 onChange={e => setSolutionFile(e.target.files?.[0] || null)}
                                                             />
                                                         </div>
+                                                        <div className="form-field">
+                                                            <label>Solution price (£)</label>
+                                                            <input
+                                                                className="admin-input"
+                                                                type="number"
+                                                                min="0.01"
+                                                                step="0.01"
+                                                                value={solutionPrice}
+                                                                onChange={e => setSolutionPrice(e.target.value)}
+                                                            />
+                                                        </div>
                                                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                                             <button className="btn-primary" onClick={saveSolution} disabled={solutionSaving || !solutionFile}>
-                                                                <FiUpload /> {solutionSaving ? 'Uploading…' : (solutionPaper.solution_file_url ? 'Replace Solution' : 'Upload Solution')}
+                                                                <FiUpload /> {solutionSaving ? 'Uploading…' : (solutionPaper.solution_file_path ? 'Replace Solution' : 'Upload Solution')}
                                                             </button>
-                                                            {solutionPaper.solution_file_url && (
+                                                            {solutionPaper.solution_file_path && (
+                                                                <button className="btn-secondary" onClick={saveSolutionPrice} disabled={solutionSaving}>
+                                                                    Save Price Only
+                                                                </button>
+                                                            )}
+                                                            {solutionPaper.solution_file_path && (
                                                                 <button className="btn-secondary" onClick={() => removeSolution(solutionPaper)} disabled={solutionSaving} style={{ color: 'var(--error)' }}>
                                                                     <FiTrash2 /> Remove
                                                                 </button>
@@ -3289,6 +3368,7 @@ Exp: 5 times 5 equals 25.`}
                                                         <option value="all">All purchases</option>
                                                         <option value="dashboard">Daily Worksheet only</option>
                                                         <option value="test_papers">Test Papers only</option>
+                                                        <option value="past_papers">Past Paper Solutions only</option>
                                                     </select>
                                                 </div>
                                                 <div className="form-field coupon-field">
@@ -3337,7 +3417,7 @@ Exp: 5 times 5 equals 25.`}
                                                             <tr key={c.id}>
                                                                 <td><strong>{c.code}</strong></td>
                                                                 <td>{c.discount_type === 'percentage' ? `${c.discount_value}%` : `£${(c.discount_value / 100).toFixed(2)}`}</td>
-                                                                <td>{c.applies_to === 'dashboard' ? 'Daily Worksheet' : c.applies_to === 'test_papers' ? 'Test Papers' : 'All'}</td>
+                                                                <td>{c.applies_to === 'dashboard' ? 'Daily Worksheet' : c.applies_to === 'test_papers' ? 'Test Papers' : c.applies_to === 'past_papers' ? 'Past Paper Solutions' : 'All'}</td>
                                                                 <td>{c.current_uses}{c.max_uses ? ` / ${c.max_uses}` : ' / ∞'}</td>
                                                                 <td>{c.min_cart_pence > 0 ? `£${(c.min_cart_pence / 100).toFixed(2)}` : '—'}</td>
                                                                 <td>{c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'Never'}</td>

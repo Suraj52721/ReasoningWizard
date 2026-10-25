@@ -122,6 +122,64 @@ serve(async (req) => {
       }
     }
 
+    // Past-paper solutions: one or many papers (cart). Price is the sum of
+    // each paper's admin-set solution price, resolved server-side.
+    let solutionRows: any[] = [];
+    let appliedCouponCode: string | null = null;
+    if (type === "past_paper_solution_purchase") {
+      const ids = [...new Set(Array.isArray(paper_ids) && paper_ids.length ? paper_ids : (paper_id ? [paper_id] : []))];
+      const bad = (msg: string) => new Response(JSON.stringify({ error: msg }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+      if (ids.length === 0) return bad("Missing paper_id");
+
+      const { data: pps } = await supabaseAdmin
+        .from("past_papers")
+        .select("id, solution_price_pence, solution_file_path")
+        .in("id", ids);
+      const valid = (pps || []).filter((p: any) => p.solution_file_path && p.solution_price_pence > 0);
+      if (valid.length !== ids.length) return bad("One or more solutions are not available for purchase.");
+
+      // Don't charge twice for solutions the user already owns.
+      const { data: owned } = await supabaseAdmin
+        .from("past_paper_purchases")
+        .select("paper_id")
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .in("paper_id", ids);
+      if ((owned || []).length > 0) return bad("You already own one or more of these solutions.");
+
+      solutionRows = valid;
+      let subtotal = valid.reduce((sum: number, p: any) => sum + p.solution_price_pence, 0);
+
+      // Admin-set bundle discount when 2+ solutions are bought together.
+      if (valid.length >= 2) {
+        const { data: bd } = await supabaseAdmin
+          .from("app_settings").select("value").eq("key", "past_paper_bundle_discount_pct").maybeSingle();
+        const pct = Math.min(Math.max(parseInt(bd?.value ?? "0", 10) || 0, 0), 100);
+        subtotal = subtotal - Math.round(subtotal * pct / 100);
+      }
+
+      orderAmount = subtotal;
+      if (coupon_code) {
+        const code = String(coupon_code).trim().toUpperCase();
+        const { data: coupon } = await supabaseAdmin
+          .from("coupon_codes").select("*").eq("code", code).eq("is_active", true).maybeSingle();
+        if (!coupon) return bad("Invalid coupon code.");
+        const scope = coupon.applies_to || "all";
+        if (scope !== "all" && scope !== "past_papers") return bad("This coupon is not valid for past paper solutions.");
+        if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) return bad("This coupon has expired.");
+        if (coupon.max_uses != null && coupon.current_uses >= coupon.max_uses) return bad("This coupon has reached its usage limit.");
+        if (coupon.min_cart_pence && subtotal < coupon.min_cart_pence) return bad("This purchase does not meet the coupon's minimum spend.");
+        const discount = coupon.discount_type === "percentage"
+          ? Math.round(subtotal * coupon.discount_value / 100)
+          : Math.min(coupon.discount_value, subtotal);
+        orderAmount = Math.max(subtotal - discount, 0);
+        if (orderAmount < 1) return bad("This coupon cannot be applied to this purchase.");
+        appliedCouponCode = code;
+      }
+    }
+
     const credentials = btoa(`${keyId}:${keySecret}`);
 
     const orderRes = await fetch("https://api.razorpay.com/v1/orders", {
@@ -167,6 +225,19 @@ serve(async (req) => {
         status: "pending",
       });
       if (error) throw new Error(`DB Insert Error (dashboard_purchases): ${error.message}`);
+    } else if (type === "past_paper_solution_purchase") {
+      const { error } = await supabaseAdmin.from("past_paper_purchases").insert(
+        solutionRows.map((p: any) => ({
+          user_id: user.id,
+          paper_id: p.id,
+          razorpay_order_id: order.id,
+          amount_pence: p.solution_price_pence,
+          currency,
+          status: "pending",
+          coupon_code: appliedCouponCode,
+        }))
+      );
+      if (error) throw new Error(`DB Insert Error (past_paper_purchases): ${error.message}`);
     } else if (type === "bundle_purchase" && paper_ids && Array.isArray(paper_ids)) {
       const { data: papers, error: fetchErr } = await supabaseAdmin.from("premium_test_papers").select("id, price_pence").in("id", paper_ids);
       if (fetchErr) throw new Error(`Fetch Error: ${fetchErr.message}`);
