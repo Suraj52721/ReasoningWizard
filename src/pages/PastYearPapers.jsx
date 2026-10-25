@@ -572,16 +572,15 @@ export default function PastYearPapers() {
                                                             ) : (
                                                                 <>
                                                                     <button
-                                                                        className="pyp-solution-btn"
-                                                                        style={{ '--diff-color': cfg.color }}
+                                                                        className="pyp-unlock-btn"
                                                                         onClick={(e) => { e.stopPropagation(); buySolutions([paper]); }}
                                                                         disabled={buyingId === paper.id}
                                                                     >
-                                                                        <FiLock /> {buyingId === paper.id ? 'Processing…' : `Unlock Solution · ${formatPrice(paper.solution_price_pence ?? 99)}`}
+                                                                        <FiLock />
+                                                                        {buyingId === paper.id ? 'Processing…' : <>Unlock Solution <span className="pyp-price-chip">{formatPrice(paper.solution_price_pence ?? 99)}</span></>}
                                                                     </button>
                                                                     <button
-                                                                        className={`pyp-solution-btn pyp-cart-toggle ${cart.has(paper.id) ? 'in-cart' : ''}`}
-                                                                        style={{ '--diff-color': cfg.color }}
+                                                                        className={`pyp-cart-toggle ${cart.has(paper.id) ? 'in-cart' : ''}`}
                                                                         onClick={(e) => { e.stopPropagation(); if (!user) { setShowLoginPopup(true); return; } toggleCart(paper.id); }}
                                                                     >
                                                                         {cart.has(paper.id) ? <><FiCheck /> In Cart</> : <><FiPlus /> Add to Cart</>}
