@@ -218,7 +218,6 @@ export default function Admin() {
     // Per-paper solution PDF editing
     const [solutionPaper, setSolutionPaper] = useState(null);
     const [solutionFile, setSolutionFile] = useState(null);
-    const [solutionPrice, setSolutionPrice] = useState('0.99');
     const [pastPaperBundlePct, setPastPaperBundlePct] = useState(0);
 
     useEffect(() => {
@@ -226,13 +225,64 @@ export default function Admin() {
             .then(({ data }) => { if (data?.value) setPastPaperBundlePct(parseInt(data.value, 10) || 0); });
     }, []);
 
-    async function updatePastPaperBundlePct() {
-        const p = prompt('Bundle discount (%) when a buyer purchases 2+ past-paper solutions together (0 = none):', pastPaperBundlePct);
-        if (p === null || p === '' || isNaN(p) || parseInt(p) < 0 || parseInt(p) > 100) return;
-        const { error } = await supabase.from('app_settings').upsert({ key: 'past_paper_bundle_discount_pct', value: parseInt(p).toString() });
-        if (error) setMessage({ type: 'error', text: 'Error updating bundle discount.' });
-        else { setPastPaperBundlePct(parseInt(p)); setMessage({ type: 'success', text: 'Past-paper bundle discount updated.' }); }
+    const [bundlePctInput, setBundlePctInput] = useState('');
+    const [bundlePctSaving, setBundlePctSaving] = useState(false);
+    const [bundlePctStatus, setBundlePctStatus] = useState(null);
+    // One universal price for every past-paper solution (pence).
+    const [solutionPricePence, setSolutionPricePence] = useState(99);
+    const [solutionPriceInput, setSolutionPriceInput] = useState('');
+    const [solutionPriceSaving, setSolutionPriceSaving] = useState(false);
+    const [solutionPriceStatus, setSolutionPriceStatus] = useState(null);
+
+    useEffect(() => {
+        supabase.from('app_settings').select('value').eq('key', 'past_paper_solution_price_pence').maybeSingle()
+            .then(({ data }) => { if (data?.value) setSolutionPricePence(parseInt(data.value, 10) || 99); });
+    }, []);
+
+    async function savePastPaperBundlePct() {
+        const n = parseInt(bundlePctInput, 10);
+        if (!Number.isFinite(n) || n < 0 || n > 100) {
+            setBundlePctStatus({ type: 'error', text: 'Enter a whole number from 0 to 100.' });
+            return;
+        }
+        setBundlePctSaving(true);
+        const { error } = await supabase.from('app_settings')
+            .upsert({ key: 'past_paper_bundle_discount_pct', value: String(n) }, { onConflict: 'key' });
+        if (error) setBundlePctStatus({ type: 'error', text: `Failed: ${error.message}` });
+        else {
+            setPastPaperBundlePct(n);
+            setBundlePctStatus({ type: 'success', text: 'Saved.' });
+        }
+        setBundlePctSaving(false);
     }
+
+    async function saveUniversalSolutionPrice() {
+        const pence = Math.round(parseFloat(solutionPriceInput) * 100);
+        if (!Number.isFinite(pence) || pence < 1) {
+            setSolutionPriceStatus({ type: 'error', text: 'Enter a valid price, e.g. 0.99.' });
+            return;
+        }
+        setSolutionPriceSaving(true);
+        // Remember it (used for newly uploaded solutions) and apply to all existing ones.
+        const { error: setErr } = await supabase.from('app_settings')
+            .upsert({ key: 'past_paper_solution_price_pence', value: String(pence) }, { onConflict: 'key' });
+        if (setErr) {
+            setSolutionPriceStatus({ type: 'error', text: `Failed: ${setErr.message}` });
+            setSolutionPriceSaving(false);
+            return;
+        }
+        const { error } = await supabase.from('past_papers')
+            .update({ solution_price_pence: pence })
+            .not('solution_file_path', 'is', null);
+        if (error) setSolutionPriceStatus({ type: 'error', text: `Failed: ${error.message}` });
+        else {
+            setSolutionPricePence(pence);
+            setPastPapers(prev => prev.map(p => p.solution_file_path ? { ...p, solution_price_pence: pence } : p));
+            setSolutionPriceStatus({ type: 'success', text: 'Price updated for all solutions.' });
+        }
+        setSolutionPriceSaving(false);
+    }
+
     const [solutionSaving, setSolutionSaving] = useState(false);
 
     // Post-quiz reward popup config (stored in app_settings key 'quiz_reward_popup')
@@ -425,11 +475,7 @@ export default function Admin() {
     // private 'past_paper_solutions' bucket.
     async function saveSolution() {
         if (!solutionPaper || !solutionFile) return;
-        const pricePence = Math.round(parseFloat(solutionPrice) * 100);
-        if (!Number.isFinite(pricePence) || pricePence < 1) {
-            setMessage({ type: 'error', text: 'Enter a valid solution price (e.g. 0.99).' });
-            return;
-        }
+        const pricePence = solutionPricePence;
         setSolutionSaving(true);
         try {
             const safe = solutionFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -466,26 +512,6 @@ export default function Admin() {
             return;
         }
         window.open(data.signedUrl, '_blank', 'noopener');
-    }
-
-    // Update only the solution price (no re-upload needed).
-    async function saveSolutionPrice() {
-        if (!solutionPaper) return;
-        const pricePence = Math.round(parseFloat(solutionPrice) * 100);
-        if (!Number.isFinite(pricePence) || pricePence < 1) {
-            setMessage({ type: 'error', text: 'Enter a valid solution price (e.g. 0.99).' });
-            return;
-        }
-        setSolutionSaving(true);
-        const { error } = await supabase.from('past_papers')
-            .update({ solution_price_pence: pricePence }).eq('id', solutionPaper.id);
-        if (error) setMessage({ type: 'error', text: `Failed: ${error.message}` });
-        else {
-            setPastPapers(prev => prev.map(p => p.id === solutionPaper.id ? { ...p, solution_price_pence: pricePence } : p));
-            setSolutionPaper(prev => ({ ...prev, solution_price_pence: pricePence }));
-            setMessage({ type: 'success', text: 'Solution price updated.' });
-        }
-        setSolutionSaving(false);
     }
 
     async function removeSolution(paper) {
@@ -2224,14 +2250,59 @@ Exp: 5 times 5 equals 25.`}
                                         </div>
                                     )}
 
-                                    <div className="nvr-price-bar glass-card" style={{ marginBottom: '1.5rem' }}>
+                                    <div className="nvr-price-bar glass-card" style={{ marginBottom: '0.75rem', flexWrap: 'wrap' }}>
                                         <div className="nvr-price-copy">
                                             <span className="nvr-price-label">Past-paper solutions bundle discount</span>
                                             <strong>{pastPaperBundlePct}% off</strong>
-                                            <small>Applied when a buyer checks out 2+ solutions together (app_settings: past_paper_bundle_discount_pct). Per-paper prices are set via each paper's Solution button.</small>
+                                            <small>Applied when a buyer checks out 2+ solutions together.</small>
                                         </div>
                                         {!isReadOnly && (
-                                            <button type="button" className="btn-secondary btn-sm" onClick={updatePastPaperBundlePct}>Change discount</button>
+                                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                <input
+                                                    className="admin-input"
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    step="1"
+                                                    placeholder="%"
+                                                    style={{ width: '90px' }}
+                                                    value={bundlePctInput}
+                                                    onChange={e => { setBundlePctInput(e.target.value); setBundlePctStatus(null); }}
+                                                />
+                                                <button type="button" className="btn-secondary btn-sm" onClick={savePastPaperBundlePct} disabled={bundlePctSaving || bundlePctInput === ''}>
+                                                    {bundlePctSaving ? 'Saving…' : 'Change discount'}
+                                                </button>
+                                                {bundlePctStatus && (
+                                                    <span style={{ fontSize: '0.85rem', color: bundlePctStatus.type === 'error' ? 'var(--error)' : '#22c55e' }}>{bundlePctStatus.text}</span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="nvr-price-bar glass-card" style={{ marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                                        <div className="nvr-price-copy">
+                                            <span className="nvr-price-label">Solution price (all papers)</span>
+                                            <strong>£{(solutionPricePence / 100).toFixed(2)}</strong>
+                                            <small>One price for every past-paper solution, including new uploads.</small>
+                                        </div>
+                                        {!isReadOnly && (
+                                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                <input
+                                                    className="admin-input"
+                                                    type="number"
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    placeholder="£"
+                                                    style={{ width: '90px' }}
+                                                    value={solutionPriceInput}
+                                                    onChange={e => { setSolutionPriceInput(e.target.value); setSolutionPriceStatus(null); }}
+                                                />
+                                                <button type="button" className="btn-secondary btn-sm" onClick={saveUniversalSolutionPrice} disabled={solutionPriceSaving || solutionPriceInput === ''}>
+                                                    {solutionPriceSaving ? 'Saving…' : 'Change price for all'}
+                                                </button>
+                                                {solutionPriceStatus && (
+                                                    <span style={{ fontSize: '0.85rem', color: solutionPriceStatus.type === 'error' ? 'var(--error)' : '#22c55e' }}>{solutionPriceStatus.text}</span>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
 
@@ -2298,7 +2369,7 @@ Exp: 5 times 5 equals 25.`}
                                                                         <motion.button
                                                                             className="btn-secondary"
                                                                             style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.7rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', ...(paper.solution_file_path ? { color: '#22c55e', borderColor: 'rgba(34,197,94,0.35)' } : {}) }}
-                                                                            onClick={() => { setSolutionPaper(paper); setSolutionFile(null); setSolutionPrice(((paper.solution_price_pence ?? 99) / 100).toFixed(2)); }}
+                                                                            onClick={() => { setSolutionPaper(paper); setSolutionFile(null); }}
                                                                             whileHover={{ scale: 1.05 }}
                                                                             whileTap={{ scale: 0.95 }}
                                                                             title={paper.solution_file_path ? 'Edit solution PDF' : 'Add solution PDF'}
@@ -2363,26 +2434,10 @@ Exp: 5 times 5 equals 25.`}
                                                                 onChange={e => setSolutionFile(e.target.files?.[0] || null)}
                                                             />
                                                         </div>
-                                                        <div className="form-field">
-                                                            <label>Solution price (£)</label>
-                                                            <input
-                                                                className="admin-input"
-                                                                type="number"
-                                                                min="0.01"
-                                                                step="0.01"
-                                                                value={solutionPrice}
-                                                                onChange={e => setSolutionPrice(e.target.value)}
-                                                            />
-                                                        </div>
                                                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                                             <button className="btn-primary" onClick={saveSolution} disabled={solutionSaving || !solutionFile}>
                                                                 <FiUpload /> {solutionSaving ? 'Uploading…' : (solutionPaper.solution_file_path ? 'Replace Solution' : 'Upload Solution')}
                                                             </button>
-                                                            {solutionPaper.solution_file_path && (
-                                                                <button className="btn-secondary" onClick={saveSolutionPrice} disabled={solutionSaving}>
-                                                                    Save Price Only
-                                                                </button>
-                                                            )}
                                                             {solutionPaper.solution_file_path && (
                                                                 <button className="btn-secondary" onClick={() => removeSolution(solutionPaper)} disabled={solutionSaving} style={{ color: 'var(--error)' }}>
                                                                     <FiTrash2 /> Remove

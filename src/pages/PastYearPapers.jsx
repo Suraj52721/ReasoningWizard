@@ -122,15 +122,15 @@ export default function PastYearPapers() {
 
     // Pricing mirrors create-razorpay-order (which is authoritative):
     // sum → bundle discount (2+ items) → coupon.
-    function priceBreakdown(list) {
+    function priceBreakdown(list, coupon = appliedCoupon) {
         const subtotal = list.reduce((s, p) => s + (p.solution_price_pence ?? 99), 0);
         const bundleDiscount = list.length >= 2 ? Math.round(subtotal * bundlePct / 100) : 0;
         const afterBundle = subtotal - bundleDiscount;
         let couponDiscount = 0;
-        if (appliedCoupon) {
-            couponDiscount = appliedCoupon.discount_type === 'percentage'
-                ? Math.round(afterBundle * appliedCoupon.discount_value / 100)
-                : Math.min(appliedCoupon.discount_value, afterBundle);
+        if (coupon) {
+            couponDiscount = coupon.discount_type === 'percentage'
+                ? Math.round(afterBundle * coupon.discount_value / 100)
+                : Math.min(coupon.discount_value, afterBundle);
         }
         return { subtotal, bundleDiscount, couponDiscount, total: Math.max(afterBundle - couponDiscount, 0) };
     }
@@ -179,7 +179,7 @@ export default function PastYearPapers() {
             if (!loaded) throw new Error('Failed to load payment gateway. Please disable ad-blockers and try again.');
             // Coupons apply to the cart checkout only.
             const coupon = fromCart ? appliedCoupon : null;
-            const total = fromCart ? priceBreakdown(list).total : list.reduce((s, p) => s + (p.solution_price_pence ?? 99), 0);
+            const total = priceBreakdown(list, coupon).total;
             const receipt = `pps_${user.id.slice(0, 6)}_${Date.now()}`;
             const { order_id, amount, currency } = await createRazorpayOrder({
                 amount: total,
@@ -293,6 +293,10 @@ export default function PastYearPapers() {
     }, {});
 
     const totalCount = filtered.length;
+
+    // "Buy all" bundle: every not-yet-owned solution in the current filter.
+    const bundleList = filtered.filter(p => p.solution_file_path && !purchasedSolutions.has(p.id));
+    const bundleBreakdown = priceBreakdown(bundleList, null);
 
     return (
         <>
@@ -452,6 +456,29 @@ export default function PastYearPapers() {
                         <span className="pyp-count">{totalCount} paper{totalCount !== 1 ? 's' : ''}</span>
                     )}
                 </motion.div>
+
+                {!loading && bundleList.length >= 2 && (
+                    <motion.div className="pyp-bundle-bar glass-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                        <div className="pyp-bundle-copy">
+                            <strong>Solutions Bundle</strong>
+                            <span>
+                                Unlock all {bundleList.length} solutions{selectedSubject !== 'All' ? ` for ${selectedSubject}` : ''}
+                                {bundlePct > 0 && <> — <b>{bundlePct}% off</b></>}
+                            </span>
+                        </div>
+                        <div className="pyp-bundle-price">
+                            {bundleBreakdown.bundleDiscount > 0 && <s>{formatPrice(bundleBreakdown.subtotal)}</s>}
+                            <strong>{formatPrice(bundleBreakdown.total)}</strong>
+                        </div>
+                        <button
+                            className="btn-primary"
+                            onClick={() => buySolutions(bundleList)}
+                            disabled={buyingId === 'cart' || cartLoading}
+                        >
+                            <FiShoppingCart /> {buyingId === 'cart' ? 'Processing…' : 'Buy Bundle'}
+                        </button>
+                    </motion.div>
+                )}
 
                 {loading ? (
                     <div className="loading-state">
